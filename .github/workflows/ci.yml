@@ -38,6 +38,23 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
 
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Format check
+      run: cargo fmt --check
+
+    - name: Clippy check
+      run: cargo clippy -- -D warnings
+
     - name: Build project
       run: cargo build --verbose
       timeout-minutes: 10
@@ -46,11 +63,29 @@ jobs:
       run: cargo test --verbose
       timeout-minutes: 5
 
+  security_audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+
+    - name: Run security audit
+      run: cargo audit
+
   publish:
     name: Build and Publish Release
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
-    needs: test
+    needs: [test, security_audit]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     strategy:
       matrix:
@@ -67,6 +102,10 @@ jobs:
             target: x86_64-apple-darwin
             artifact_name: clipboard-history
             asset_name: clipboard-history-macos-x64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: clipboard-history
+            asset_name: clipboard-history-macos-arm64
 
     steps:
     - name: Checkout repository
@@ -111,12 +150,28 @@ jobs:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
 
-    - name: Get version from Cargo.toml
+    - name: Get version and build info
       id: version
       run: |
         VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-        echo "version=v$VERSION" >> $GITHUB_OUTPUT
-        echo "Version: $VERSION"
+        BUILD_NUMBER=${{ github.run_number }}
+        COMMIT_SHA=${GITHUB_SHA:0:7}
+        DATE=$(date +'%Y%m%d')
+        
+        # Create version with build info: v0.1.0-build.123.abc1234
+        FULL_VERSION="v${VERSION}-build.${BUILD_NUMBER}.${COMMIT_SHA}"
+        
+        echo "base_version=$VERSION" >> $GITHUB_OUTPUT
+        echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
+        echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+        echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+        echo "build_date=$DATE" >> $GITHUB_OUTPUT
+        
+        echo "Base Version: $VERSION"
+        echo "Full Version: $FULL_VERSION"
+        echo "Build Number: $BUILD_NUMBER"
+        echo "Commit SHA: $COMMIT_SHA"
+        echo "Build Date: $DATE"
 
     - name: Check if tag exists
       id: tag_check
@@ -129,15 +184,71 @@ jobs:
           echo "Tag ${{ steps.version.outputs.version }} does not exist"
         fi
 
+    - name: Generate changelog
+      id: changelog
+      if: steps.tag_check.outputs.exists == 'false'
+      run: |
+        # Get commits since last tag
+        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        if [ -z "$LAST_TAG" ]; then
+          echo "Getting all commits (no previous tags found)"
+          COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges | head -20)
+        else
+          echo "Getting commits since $LAST_TAG"
+          COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+        fi
+        
+        # Create changelog content
+        CHANGELOG="### What's Changed"$'\n'"$COMMITS"
+        
+        # Save to output (handle multiline)
+        EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+        echo "content<<$EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "$EOF" >> $GITHUB_OUTPUT
+
     - name: Prepare release assets
       if: steps.tag_check.outputs.exists == 'false'
       run: |
         ls -la
         find . -name "clipboard-history*" -type f
         mkdir -p release-assets
+        
+        # Copy and rename assets with build info
+        cp clipboard-history-linux-x64/clipboard-history release-assets/clipboard-history-linux-x64-${{ steps.version.outputs.build_number }}
+        cp clipboard-history-windows-x64.exe/clipboard-history.exe release-assets/clipboard-history-windows-x64-${{ steps.version.outputs.build_number }}.exe
+        cp clipboard-history-macos-x64/clipboard-history release-assets/clipboard-history-macos-x64-${{ steps.version.outputs.build_number }}
+        cp clipboard-history-macos-arm64/clipboard-history release-assets/clipboard-history-macos-arm64-${{ steps.version.outputs.build_number }}
+        
+        # Also create standard names for compatibility
         cp clipboard-history-linux-x64/clipboard-history release-assets/clipboard-history-linux-x64
         cp clipboard-history-windows-x64.exe/clipboard-history.exe release-assets/clipboard-history-windows-x64.exe
         cp clipboard-history-macos-x64/clipboard-history release-assets/clipboard-history-macos-x64
+        cp clipboard-history-macos-arm64/clipboard-history release-assets/clipboard-history-macos-arm64
+        
+        # Create build info file
+        cat > release-assets/BUILD_INFO.txt << EOF
+        Build Information
+        =================
+        Version: ${{ steps.version.outputs.base_version }}
+        Build Number: ${{ steps.version.outputs.build_number }}
+        Commit SHA: ${{ steps.version.outputs.commit_sha }}
+        Build Date: ${{ steps.version.outputs.build_date }}
+        Full Version: ${{ steps.version.outputs.version }}
+        
+        Platform Binaries:
+        - clipboard-history-linux-x64 (Linux x86_64)
+        - clipboard-history-windows-x64.exe (Windows x86_64) 
+        - clipboard-history-macos-x64 (macOS Intel x86_64)
+        - clipboard-history-macos-arm64 (macOS Apple Silicon ARM64)
+        
+        Versioned Binaries (with build number):
+        - clipboard-history-linux-x64-${{ steps.version.outputs.build_number }}
+        - clipboard-history-windows-x64-${{ steps.version.outputs.build_number }}.exe
+        - clipboard-history-macos-x64-${{ steps.version.outputs.build_number }}
+        - clipboard-history-macos-arm64-${{ steps.version.outputs.build_number }}
+        EOF
+        
         ls -la release-assets/
 
     - name: Create GitHub Release
@@ -145,28 +256,84 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ steps.version.outputs.version }}
-        name: Release ${{ steps.version.outputs.version }}
+        name: 🚀 Clipboard History Manager ${{ steps.version.outputs.version }}
         body: |
-          ## Clipboard History Manager ${{ steps.version.outputs.version }}
+          ## 📋 Clipboard History Manager ${{ steps.version.outputs.version }}
           
-          ### Features
-          - Cross-platform clipboard monitoring
-          - Fuzzy search through clipboard history
-          - JSON persistence storage
-          - Console-based interface
+          **Build Information**
+          - 📦 **Version**: `${{ steps.version.outputs.base_version }}`
+          - 🔢 **Build**: `#${{ steps.version.outputs.build_number }}`
+          - 💾 **Commit**: `${{ steps.version.outputs.commit_sha }}`
+          - 📅 **Date**: `${{ steps.version.outputs.build_date }}`
           
-          ### Downloads
-          - **Linux (x64)**: `clipboard-history-linux-x64`
-          - **Windows (x64)**: `clipboard-history-windows-x64.exe`  
-          - **macOS (x64)**: `clipboard-history-macos-x64`
+          ### ✨ Features
+          - 🖥️ **Cross-platform clipboard monitoring** - Works on Linux, Windows, and macOS
+          - 🔍 **Smart search capabilities** - Both exact and fuzzy search through history
+          - 💾 **Persistent storage** - Your clipboard history survives restarts
+          - 🎯 **Intelligent content analysis** - Detects JSON, URLs, and multi-line content
+          - 📊 **Usage statistics** - Track your clipboard usage patterns
+          - 🛡️ **Content size limits** - Handles content up to 10MB safely
+          - 🎨 **Smart previews** - Content-aware previews with size information
           
-          ### Installation
+          ### 📥 Downloads
+          
+          **Standard Downloads:**
+          - 🐧 **Linux (x64)**: [`clipboard-history-linux-x64`](../../releases/download/${{ steps.version.outputs.version }}/clipboard-history-linux-x64)
+          - 🪟 **Windows (x64)**: [`clipboard-history-windows-x64.exe`](../../releases/download/${{ steps.version.outputs.version }}/clipboard-history-windows-x64.exe)
+          - 🍎 **macOS Intel (x64)**: [`clipboard-history-macos-x64`](../../releases/download/${{ steps.version.outputs.version }}/clipboard-history-macos-x64)
+          - 🍎 **macOS Apple Silicon (ARM64)**: [`clipboard-history-macos-arm64`](../../releases/download/${{ steps.version.outputs.version }}/clipboard-history-macos-arm64)
+          
+          **Versioned Downloads (with build number):**
+          - 🐧 **Linux**: `clipboard-history-linux-x64-${{ steps.version.outputs.build_number }}`
+          - 🪟 **Windows**: `clipboard-history-windows-x64-${{ steps.version.outputs.build_number }}.exe`
+          - 🍎 **macOS Intel**: `clipboard-history-macos-x64-${{ steps.version.outputs.build_number }}`
+          - 🍎 **macOS ARM**: `clipboard-history-macos-arm64-${{ steps.version.outputs.build_number }}`
+          
+          ### 🚀 Quick Start
+          
+          ```bash
+          # Linux/macOS
+          chmod +x clipboard-history-*
+          ./clipboard-history-linux-x64  # or macos-x64
+          
+          # Windows
+          clipboard-history-windows-x64.exe
+          ```
+          
+          ### 🔧 Installation Options
+          
+          **Option 1: Direct Download**
           1. Download the binary for your platform
           2. Make it executable (Linux/macOS): `chmod +x clipboard-history-*`
-          3. Run it directly: `./clipboard-history-*`
+          3. Run it: `./clipboard-history-*`
           
-          ### Changes
-          See commit history for detailed changes in this release.
+          **Option 2: Build from Source**
+          ```bash
+          git clone https://github.com/MegoCs/clipboard-history.git
+          cd clipboard-history
+          cargo build --release
+          ```
+          
+          ### 📋 Usage
+          
+          - **Monitor**: Automatically monitors your clipboard
+          - **Search**: Use fuzzy search to find clipboard entries
+          - **History**: View your complete clipboard history
+          - **Statistics**: Check usage stats and content limits
+          
+          ### 🔄 What's New
+          
+          ${{ steps.changelog.outputs.content }}
+          
+          ---
+          
+          **🏗️ Build Details**
+          - Built with GitHub Actions
+          - Tested on Ubuntu, Windows, and macOS
+          - Security audited with `cargo audit`
+          - Code quality checked with `clippy` and `rustfmt`
+          
+          📁 See `BUILD_INFO.txt` for complete build information.
         files: |
           release-assets/*
         draft: false

@@ -104,7 +104,7 @@ async fn test_content_size_limit() {
     let oversized_content = "x".repeat(10_000_001);
     let result = manager.add_item(oversized_content).await;
     assert!(result.is_err());
-    
+
     let error = result.unwrap_err();
     assert!(error.to_string().contains("Content too large"));
 }
@@ -114,11 +114,14 @@ async fn test_usage_stats() {
     let manager = ClipboardManager::new_empty();
 
     manager.add_item("Small".to_string()).await.unwrap();
-    manager.add_item("Medium content here".to_string()).await.unwrap();
+    manager
+        .add_item("Medium content here".to_string())
+        .await
+        .unwrap();
     manager.add_item("x".repeat(1000)).await.unwrap(); // Large content
 
     let (item_count, total_size, avg_size, largest_item) = manager.get_usage_stats().await;
-    
+
     assert_eq!(item_count, 3);
     assert!(total_size > 1000);
     assert_eq!(largest_item, 1000);
@@ -129,7 +132,7 @@ async fn test_usage_stats() {
 async fn test_content_limits() {
     let manager = ClipboardManager::new_empty();
     let (max_content, max_history, max_preview) = manager.get_content_limits();
-    
+
     assert_eq!(max_content, 10_000_000);
     assert_eq!(max_history, 1000);
     assert_eq!(max_preview, 200);

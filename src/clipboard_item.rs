@@ -20,6 +20,7 @@ impl ClipboardItem {
         }
     }
 
+    #[allow(dead_code)] // Used by tests and might be used by future UI implementations
     pub fn preview(&self, max_chars: usize) -> String {
         if self.content.len() <= max_chars {
             self.content.clone()
@@ -32,12 +33,17 @@ impl ClipboardItem {
     /// Get a smart preview that shows content type and size for large entries
     pub fn smart_preview(&self, max_chars: usize) -> String {
         let content_info = self.analyze_content();
-        
+
         if self.content.len() <= max_chars {
             self.content.clone()
         } else {
             let truncated = self.content.chars().take(max_chars).collect::<String>();
-            format!("{} [{}, {}...]", truncated, content_info, self.format_content_size())
+            format!(
+                "{} [{}, {}...]",
+                truncated,
+                content_info,
+                self.format_content_size()
+            )
         }
     }
 
@@ -56,7 +62,7 @@ impl ClipboardItem {
     /// Analyze content type for better preview
     fn analyze_content(&self) -> &'static str {
         let content = &self.content;
-        
+
         // Check for common data patterns
         if content.trim().starts_with('{') && content.trim().ends_with('}') {
             "JSON"
@@ -66,7 +72,10 @@ impl ClipboardItem {
             "URL/Link"
         } else if content.lines().count() > 10 {
             "Multi-line"
-        } else if content.chars().all(|c| c.is_ascii_digit() || c.is_whitespace() || c == '.' || c == '-') {
+        } else if content
+            .chars()
+            .all(|c| c.is_ascii_digit() || c.is_whitespace() || c == '.' || c == '-')
+        {
             "Numeric"
         } else {
             "Text"
@@ -81,4 +90,4 @@ impl ClipboardItem {
             format!("ts:{}", self.timestamp)
         }
     }
-        }
+}

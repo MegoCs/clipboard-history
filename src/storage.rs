@@ -22,6 +22,7 @@ impl Storage {
     }
 
     // Public method for testing - allows specifying a custom file path
+    #[allow(dead_code)] // Used by tests
     pub fn new_with_file(file_path: PathBuf) -> io::Result<Self> {
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent)?;

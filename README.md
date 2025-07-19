@@ -1,25 +1,75 @@
-# Clipboard History Manager
+# 📋 Clipboard History Manager
 
-A powerful, searchable clipboard history manager written in Rust that runs in the background and keeps track of all your copied items.
+A **powerful, intelligent clipboard history manager** written in Rust with advanced search capabilities, smart content analysis, and cross-platform support.
 
-## Features
+[![CI](https://github.com/MegoCs/clipboard-history/workflows/CI/badge.svg)](https://github.com/MegoCs/clipboard-history/actions)
+[![Security Audit](https://github.com/MegoCs/clipboard-history/workflows/Security%20Audit/badge.svg)](https://github.com/MegoCs/clipboard-history/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-- **Background Monitoring**: Automatically captures clipboard changes without user intervention
-- **Persistent Storage**: Saves clipboard history to disk and restores it on startup  
-- **Advanced Search**: Both exact text matching and fuzzy search capabilities
-- **Interactive Interface**: Clean, number-based interface for easy selection
-- **Copy-to-Clipboard**: Select any historical item to copy it back to clipboard
-- **Cross-Platform**: Works on Windows, macOS, and Linux
-- **Lightweight**: Minimal resource usage while running in the background
+## ✨ Features
 
-## Installation
+### 🚀 **Core Capabilities**
+- **🖥️ Background Monitoring**: Automatically captures clipboard changes without user intervention
+- **💾 Persistent Storage**: Saves clipboard history to disk and restores it on startup  
+- **🔍 Intelligent Search**: Both exact text matching and fuzzy search with content-type detection
+- **🎯 Smart Previews**: Context-aware content previews with size information
+- **📊 Usage Analytics**: Track clipboard usage patterns and statistics
+- **🌐 Cross-Platform**: Works seamlessly on Windows, macOS, and Linux
 
-1. Make sure you have Rust installed (https://rustup.rs/)
-2. Clone or download this project
-3. Build the application:
-   ```bash
-   cargo build --release
-   ```
+### 🧠 **Advanced Search Features**
+- **Fuzzy Matching**: Find items even with typos (`"passowrd"` finds `"password"`)
+- **Content Detection**: Automatically identifies JSON, URLs, code, and multi-line text
+- **Smart Previews**: Shows content type and size (`JSON: {...} [1.2 KB]`)
+- **Multiple Search Modes**: Exact, fuzzy, and combined search results
+- **Performance Optimized**: Fast search through thousands of clipboard items
+
+### 🛡️ **Enterprise-Grade Quality**
+- **Security Audited**: Regular vulnerability scanning with `cargo audit`
+- **Memory Safe**: Built with Rust for zero buffer overflows
+- **Performance Optimized**: Handles content up to 10MB with smart limits
+- **Test Coverage**: Comprehensive unit and integration tests
+- **CI/CD Pipeline**: Automated testing and releases
+
+> 🎬 **[See Search Demo](SEARCH_DEMO.md)** | 📖 **[CI/CD Details](CI_CD_SETUP.md)**
+
+## 📥 Installation
+
+### 🚀 **Quick Start (Recommended)**
+Download pre-built binaries from [GitHub Releases](../../releases/latest):
+
+```bash
+# Linux
+wget https://github.com/MegoCs/clipboard-history/releases/latest/download/clipboard-history-linux-x64
+chmod +x clipboard-history-linux-x64
+./clipboard-history-linux-x64
+
+# macOS (Intel)
+wget https://github.com/MegoCs/clipboard-history/releases/latest/download/clipboard-history-macos-x64
+chmod +x clipboard-history-macos-x64
+./clipboard-history-macos-x64
+
+# macOS (Apple Silicon)
+wget https://github.com/MegoCs/clipboard-history/releases/latest/download/clipboard-history-macos-arm64
+chmod +x clipboard-history-macos-arm64  
+./clipboard-history-macos-arm64
+
+# Windows - Download clipboard-history-windows-x64.exe and double-click
+```
+
+### 🛠️ **Build from Source**
+```bash
+# Prerequisites: Rust 1.70+ (install from https://rustup.rs)
+git clone https://github.com/MegoCs/clipboard-history.git
+cd clipboard-history
+cargo build --release
+
+# Binary will be at: target/release/clipboard-history[.exe]
+```
+
+### 📦 **Platform Requirements**
+- **Linux**: XCB libraries (`sudo apt install libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev`)
+- **Windows**: Windows 10+ (no additional dependencies)
+- **macOS**: macOS 10.15+ (both Intel and Apple Silicon supported)
 
 ## Usage
 

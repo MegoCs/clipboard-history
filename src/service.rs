@@ -18,7 +18,7 @@ impl ClipboardService {
     pub async fn new() -> io::Result<Self> {
         let manager = Arc::new(ClipboardManager::new().await?);
         let monitor = ClipboardMonitor::new(Arc::clone(&manager));
-        
+
         Ok(Self {
             manager,
             monitor: Some(monitor),
@@ -26,6 +26,7 @@ impl ClipboardService {
     }
 
     /// Create a service instance with a provided manager (for testing)
+    #[allow(dead_code)] // Used by tests
     pub fn new_with_manager(manager: Arc<ClipboardManager>) -> Self {
         Self {
             manager,
@@ -41,11 +42,11 @@ impl ClipboardService {
             let monitor_task = tokio::spawn(async move {
                 monitor.start_monitoring().await;
             });
-            
+
             // Store the task handle if needed for cleanup
             // For now, we'll let it run until the service is dropped
             std::mem::forget(monitor_task);
-            
+
             Some(event_receiver)
         } else {
             None

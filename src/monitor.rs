@@ -21,7 +21,7 @@ pub struct ClipboardMonitor {
 impl ClipboardMonitor {
     pub fn new(manager: Arc<ClipboardManager>) -> Self {
         let (event_sender, _) = broadcast::channel(100);
-        
+
         Self {
             manager,
             poll_interval: Duration::from_millis(500),
@@ -41,7 +41,7 @@ impl ClipboardMonitor {
 
     pub async fn start_monitoring(&self) {
         let mut last_content = String::new();
-        
+
         // Notify that monitoring has started
         let _ = self.event_sender.send(ClipboardEvent::Started);
 
@@ -57,13 +57,13 @@ impl ClipboardMonitor {
                     } else {
                         content[..50.min(content.len())].to_string()
                     };
-                    
+
                     match self.manager.add_item(content.clone()).await {
-                            Ok(()) => {
-                                let _ = self.event_sender.send(ClipboardEvent::ItemAdded {
-                                    preview,
-                                });
-                            }
+                        Ok(()) => {
+                            let _ = self
+                                .event_sender
+                                .send(ClipboardEvent::ItemAdded { preview });
+                        }
                         Err(e) => {
                             let _ = self.event_sender.send(ClipboardEvent::Error {
                                 message: format!("Error adding clipboard item: {}", e),
@@ -73,9 +73,7 @@ impl ClipboardMonitor {
                     last_content = content;
                 }
             } else if let Err(e) = content {
-                let _ = self.event_sender.send(ClipboardEvent::Error {
-                    message: e,
-                });
+                let _ = self.event_sender.send(ClipboardEvent::Error { message: e });
             }
 
             tokio::time::sleep(self.poll_interval).await;
@@ -101,12 +99,12 @@ fn format_bytes(bytes: usize) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB"];
     let mut size = bytes as f64;
     let mut unit_index = 0;
-    
+
     while size >= 1024.0 && unit_index < UNITS.len() - 1 {
         size /= 1024.0;
         unit_index += 1;
     }
-    
+
     if unit_index == 0 {
         format!("{} {}", size as usize, UNITS[unit_index])
     } else {

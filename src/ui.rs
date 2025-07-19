@@ -12,16 +12,19 @@ pub struct ConsoleInterface {
 
 impl ConsoleInterface {
     pub fn new(
-        service: ClipboardService, 
-        event_receiver: Option<broadcast::Receiver<ClipboardEvent>>
+        service: ClipboardService,
+        event_receiver: Option<broadcast::Receiver<ClipboardEvent>>,
     ) -> Self {
-        Self { service, event_receiver }
+        Self {
+            service,
+            event_receiver,
+        }
     }
 
     pub async fn run(mut self) -> io::Result<()> {
         // Display startup information
         self.show_startup_info().await;
-        
+
         // Start listening for clipboard events in the background
         if let Some(mut receiver) = self.event_receiver.take() {
             tokio::spawn(async move {
@@ -38,7 +41,7 @@ impl ConsoleInterface {
     async fn show_startup_info(&self) {
         let count = self.service.get_history_count().await;
         let storage_path = self.service.get_storage_path();
-        
+
         println!("Clipboard Manager Started!");
         println!("Items loaded: {}", count);
         println!("Storage location: {:?}", storage_path);
@@ -151,7 +154,7 @@ impl ConsoleInterface {
     async fn show_usage_info(&self) {
         let (item_count, total_size, avg_size, largest_item) = self.service.get_usage_stats().await;
         let (max_content, max_history, _) = self.service.get_content_limits();
-        
+
         println!("\n=== Clipboard Usage Statistics ===");
         println!("Items in history: {} / {} max", item_count, max_history);
         println!("Total content size: {}", format_size(total_size));
@@ -159,7 +162,7 @@ impl ConsoleInterface {
         println!("Largest item size: {}", format_size(largest_item));
         println!("Maximum single item: {}", format_size(max_content));
         println!("Storage location: {:?}", self.service.get_storage_path());
-        
+
         // Show memory usage estimate
         let estimated_memory = total_size + (item_count * 64); // rough estimate with overhead
         println!("Estimated memory usage: {}", format_size(estimated_memory));
@@ -212,7 +215,8 @@ impl ConsoleInterface {
                 query,
                 fuzzy_results.len()
             );
-            self.display_search_results_with_scores(&fuzzy_results).await?;
+            self.display_search_results_with_scores(&fuzzy_results)
+                .await?;
         } else if !exact_results.is_empty() {
             println!(
                 "\n=== Search Results for '{}' ({} found) ===",
@@ -235,10 +239,7 @@ impl ConsoleInterface {
         println!("  - Type 'h' for this help message");
     }
 
-    async fn display_search_results_with_scores(
-        &self,
-        results: &[SearchResult],
-    ) -> io::Result<()> {
+    async fn display_search_results_with_scores(&self, results: &[SearchResult]) -> io::Result<()> {
         let display_count = results.len().min(15);
 
         for (display_num, result) in results.iter().take(display_count).enumerate() {
@@ -282,7 +283,8 @@ impl ConsoleInterface {
             );
         }
 
-        self.handle_search_selection_exact_search_result(results).await
+        self.handle_search_selection_exact_search_result(results)
+            .await
     }
 
     async fn handle_search_selection_with_scores(
@@ -458,12 +460,12 @@ fn format_size(bytes: usize) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB"];
     let mut size = bytes as f64;
     let mut unit_index = 0;
-    
+
     while size >= 1024.0 && unit_index < UNITS.len() - 1 {
         size /= 1024.0;
         unit_index += 1;
     }
-    
+
     if unit_index == 0 {
         format!("{} {}", size as usize, UNITS[unit_index])
     } else {

@@ -44,7 +44,11 @@ fn test_smart_preview() {
 #[test]
 fn test_content_analysis() {
     // Test JSON detection with content that will be truncated
-    let json_content = format!("{{{}, \"large_field\": \"{}\"}}", "\"key\": \"value\"", "x".repeat(200));
+    let json_content = format!(
+        "{{{}, \"large_field\": \"{}\"}}",
+        "\"key\": \"value\"",
+        "x".repeat(200)
+    );
     let json_item = ClipboardItem::new(json_content, 1);
     let preview = json_item.smart_preview(50);
     assert!(preview.contains("JSON"));
@@ -56,7 +60,9 @@ fn test_content_analysis() {
     assert!(preview.contains("URL"));
 
     // Test multi-line detection
-    let multiline_content = "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\nLine 11".to_string();
+    let multiline_content =
+        "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\nLine 11"
+            .to_string();
     let multiline_item = ClipboardItem::new(multiline_content, 1);
     let preview = multiline_item.smart_preview(20);
     assert!(preview.contains("Multi-line"));

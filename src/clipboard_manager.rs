@@ -33,6 +33,7 @@ impl ClipboardManager {
     }
 
     // Public method for testing - creates an empty manager
+    #[allow(dead_code)] // Used by tests
     pub fn new_empty() -> Self {
         let history = Arc::new(Mutex::new(VecDeque::new()));
         // Create a dummy storage for testing
@@ -51,10 +52,10 @@ impl ClipboardManager {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
-                    "Content too large: {} bytes (max: {} bytes)", 
-                    content.len(), 
+                    "Content too large: {} bytes (max: {} bytes)",
+                    content.len(),
                     MAX_CONTENT_SIZE
-                )
+                ),
             ));
         }
 
@@ -164,6 +165,7 @@ impl ClipboardManager {
     }
 
     /// Get total size of all clipboard content in bytes
+    #[allow(dead_code)] // Utility method that might be used by future features
     pub async fn get_total_content_size(&self) -> usize {
         let history = self.history.lock().await;
         history.iter().map(|item| item.content.len()).sum()
@@ -174,9 +176,17 @@ impl ClipboardManager {
         let history = self.history.lock().await;
         let item_count = history.len();
         let total_size = history.iter().map(|item| item.content.len()).sum();
-        let avg_size = if item_count > 0 { total_size / item_count } else { 0 };
-        let largest_item = history.iter().map(|item| item.content.len()).max().unwrap_or(0);
-        
+        let avg_size = if item_count > 0 {
+            total_size / item_count
+        } else {
+            0
+        };
+        let largest_item = history
+            .iter()
+            .map(|item| item.content.len())
+            .max()
+            .unwrap_or(0);
+
         (item_count, total_size, avg_size, largest_item)
     }
 
