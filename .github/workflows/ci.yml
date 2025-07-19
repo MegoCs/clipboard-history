@@ -36,3 +36,126 @@ jobs:
 
     - name: Run tests
       run: cargo test --verbose
+
+  publish:
+    name: Build and Publish Release
+    runs-on: ${{ matrix.os }}
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: clipboard-history
+            asset_name: clipboard-history-linux-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: clipboard-history.exe
+            asset_name: clipboard-history-windows-x64.exe
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: clipboard-history
+            asset_name: clipboard-history-macos-x64
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Linux system dependencies
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Build release binary
+      run: cargo build --release --target ${{ matrix.target }}
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.asset_name }}
+        path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+
+  create_release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Get version from Cargo.toml
+      id: version
+      run: |
+        VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+        echo "version=v$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
+    - name: Check if tag exists
+      id: tag_check
+      run: |
+        if git rev-parse "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "Tag ${{ steps.version.outputs.version }} already exists"
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "Tag ${{ steps.version.outputs.version }} does not exist"
+        fi
+
+    - name: Prepare release assets
+      if: steps.tag_check.outputs.exists == 'false'
+      run: |
+        ls -la
+        find . -name "clipboard-history*" -type f
+        mkdir -p release-assets
+        cp clipboard-history-linux-x64/clipboard-history release-assets/clipboard-history-linux-x64
+        cp clipboard-history-windows-x64.exe/clipboard-history.exe release-assets/clipboard-history-windows-x64.exe
+        cp clipboard-history-macos-x64/clipboard-history release-assets/clipboard-history-macos-x64
+        ls -la release-assets/
+
+    - name: Create GitHub Release
+      if: steps.tag_check.outputs.exists == 'false'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        name: Release ${{ steps.version.outputs.version }}
+        body: |
+          ## Clipboard History Manager ${{ steps.version.outputs.version }}
+          
+          ### Features
+          - Cross-platform clipboard monitoring
+          - Fuzzy search through clipboard history
+          - JSON persistence storage
+          - Console-based interface
+          
+          ### Downloads
+          - **Linux (x64)**: `clipboard-history-linux-x64`
+          - **Windows (x64)**: `clipboard-history-windows-x64.exe`  
+          - **macOS (x64)**: `clipboard-history-macos-x64`
+          
+          ### Installation
+          1. Download the binary for your platform
+          2. Make it executable (Linux/macOS): `chmod +x clipboard-history-*`
+          3. Run it directly: `./clipboard-history-*`
+          
+          ### Changes
+          See commit history for detailed changes in this release.
+        files: |
+          release-assets/*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
