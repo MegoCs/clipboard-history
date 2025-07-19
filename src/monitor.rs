@@ -1,20 +1,37 @@
 use clipboard::ClipboardProvider;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::broadcast;
 
 use crate::clipboard_manager::ClipboardManager;
+
+#[derive(Debug, Clone)]
+pub enum ClipboardEvent {
+    ItemAdded { content: String, preview: String },
+    Error { message: String },
+    Started,
+    Stopped,
+}
 
 pub struct ClipboardMonitor {
     manager: Arc<ClipboardManager>,
     poll_interval: Duration,
+    event_sender: broadcast::Sender<ClipboardEvent>,
 }
 
 impl ClipboardMonitor {
     pub fn new(manager: Arc<ClipboardManager>) -> Self {
+        let (event_sender, _) = broadcast::channel(100);
+        
         Self {
             manager,
             poll_interval: Duration::from_millis(500),
+            event_sender,
         }
+    }
+
+    pub fn subscribe(&self) -> broadcast::Receiver<ClipboardEvent> {
+        self.event_sender.subscribe()
     }
 
     #[allow(dead_code)]
@@ -25,18 +42,36 @@ impl ClipboardMonitor {
 
     pub async fn start_monitoring(&self) {
         let mut last_content = String::new();
+        
+        // Notify that monitoring has started
+        let _ = self.event_sender.send(ClipboardEvent::Started);
 
         loop {
             let content = self.get_clipboard_content().await;
 
             if let Ok(content) = content {
                 if !content.is_empty() && content != last_content {
-                    println!("New clipboard: {:?}", &content[..50.min(content.len())]);
-                    if let Err(e) = self.manager.add_item(content.clone()).await {
-                        eprintln!("Error adding clipboard item: {}", e);
+                    let preview = content[..50.min(content.len())].to_string();
+                    
+                    match self.manager.add_item(content.clone()).await {
+                        Ok(()) => {
+                            let _ = self.event_sender.send(ClipboardEvent::ItemAdded {
+                                content: content.clone(),
+                                preview,
+                            });
+                        }
+                        Err(e) => {
+                            let _ = self.event_sender.send(ClipboardEvent::Error {
+                                message: format!("Error adding clipboard item: {}", e),
+                            });
+                        }
                     }
                     last_content = content;
                 }
+            } else if let Err(e) = content {
+                let _ = self.event_sender.send(ClipboardEvent::Error {
+                    message: e,
+                });
             }
 
             tokio::time::sleep(self.poll_interval).await;
