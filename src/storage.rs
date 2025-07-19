@@ -14,11 +14,21 @@ impl Storage {
         let data_dir = dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("clipboard-history");
-        
+
         fs::create_dir_all(&data_dir)?;
         let data_file = data_dir.join("history.json");
-        
+
         Ok(Self { data_file })
+    }
+
+    #[cfg(test)]
+    pub fn new_with_file(file_path: PathBuf) -> io::Result<Self> {
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        Ok(Self {
+            data_file: file_path,
+        })
     }
 
     pub fn get_data_file_path(&self) -> &PathBuf {
@@ -27,7 +37,7 @@ impl Storage {
 
     pub async fn load_history(&self) -> io::Result<VecDeque<ClipboardItem>> {
         println!("Looking for history at: {:?}", self.data_file);
-        
+
         if self.data_file.exists() {
             let content = fs::read_to_string(&self.data_file)?;
             if let Ok(loaded) = serde_json::from_str::<VecDeque<ClipboardItem>>(&content) {
@@ -35,11 +45,11 @@ impl Storage {
                 return Ok(loaded);
             }
         }
-        
+
         println!("No existing history found, starting fresh");
         Ok(VecDeque::new())
     }
-    
+
     pub async fn save_history(&self, history: &VecDeque<ClipboardItem>) -> io::Result<()> {
         let json = serde_json::to_string_pretty(history)?;
         fs::write(&self.data_file, json)?;

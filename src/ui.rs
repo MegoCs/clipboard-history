@@ -1,5 +1,5 @@
-use crate::clipboard_manager::ClipboardManager;
 use crate::clipboard_item::ClipboardItem;
+use crate::clipboard_manager::ClipboardManager;
 use std::io;
 use std::sync::Arc;
 
@@ -21,9 +21,9 @@ impl UserInterface {
             self.show_menu().await;
             let mut input = String::new();
             io::stdin().read_line(&mut input)?;
-            
+
             let command = input.trim().to_lowercase();
-            
+
             match command.as_str() {
                 "q" | "quit" | "exit" => {
                     println!("Goodbye!");
@@ -79,7 +79,7 @@ impl UserInterface {
 
     async fn show_history(&self) {
         let history = self.manager.get_history().await;
-        
+
         if history.is_empty() {
             println!("No items yet. Try copying something!");
             return;
@@ -102,12 +102,12 @@ impl UserInterface {
             println!("\n=== Search Mode ===");
             println!("Enter search term (or 'q' to quit, 'h' for help):");
             print!("> ");
-            
+
             let mut query = String::new();
             io::stdin().read_line(&mut query)?;
-            
+
             let query = query.trim();
-            
+
             match query.to_lowercase().as_str() {
                 "q" | "quit" | "exit" => {
                     println!("Exiting search mode.");
@@ -144,7 +144,7 @@ impl UserInterface {
         // First try fuzzy search for better results
         let fuzzy_results = self.manager.fuzzy_search_history(query).await;
         let text_results = self.manager.search_history(query).await;
-        
+
         if fuzzy_results.is_empty() && text_results.is_empty() {
             println!("No items found matching '{}'", query);
             return Ok(());
@@ -152,58 +152,96 @@ impl UserInterface {
 
         // Display fuzzy results first (they're usually more relevant)
         if !fuzzy_results.is_empty() {
-            println!("\n=== Fuzzy Search Results for '{}' ({} found) ===", query, fuzzy_results.len());
-            self.display_search_results_with_scores(&fuzzy_results).await?;
+            println!(
+                "\n=== Fuzzy Search Results for '{}' ({} found) ===",
+                query,
+                fuzzy_results.len()
+            );
+            self.display_search_results_with_scores(&fuzzy_results)
+                .await?;
         } else if !text_results.is_empty() {
-            println!("\n=== Search Results for '{}' ({} found) ===", query, text_results.len());
+            println!(
+                "\n=== Search Results for '{}' ({} found) ===",
+                query,
+                text_results.len()
+            );
             self.display_search_results(&text_results).await?;
         }
 
         Ok(())
     }
 
-    async fn display_search_results_with_scores(&self, results: &[(usize, ClipboardItem, i64)]) -> io::Result<()> {
+    async fn display_search_results_with_scores(
+        &self,
+        results: &[(usize, ClipboardItem, i64)],
+    ) -> io::Result<()> {
         let display_count = results.len().min(15);
-        
-        for (display_num, (_original_index, item, score)) in results.iter().take(display_count).enumerate() {
+
+        for (display_num, (_original_index, item, score)) in
+            results.iter().take(display_count).enumerate()
+        {
             let preview = item.preview(70);
             let timestamp = item.formatted_timestamp();
-            println!("{}. [Score: {}] {} [{}]", 
-                display_num + 1, score, preview, timestamp);
-        }
-        
-        if results.len() > display_count {
-            println!("... and {} more results (showing top {})", 
-                results.len() - display_count, display_count);
+            println!(
+                "{}. [Score: {}] {} [{}]",
+                display_num + 1,
+                score,
+                preview,
+                timestamp
+            );
         }
 
-        self.handle_search_selection(results.iter().map(|(idx, item, _)| (*idx, item.clone())).collect()).await
+        if results.len() > display_count {
+            println!(
+                "... and {} more results (showing top {})",
+                results.len() - display_count,
+                display_count
+            );
+        }
+
+        self.handle_search_selection(
+            results
+                .iter()
+                .map(|(idx, item, _)| (*idx, item.clone()))
+                .collect(),
+        )
+        .await
     }
 
     async fn display_search_results(&self, results: &[(usize, ClipboardItem)]) -> io::Result<()> {
         let display_count = results.len().min(15);
-        
-        for (display_num, (_original_index, item)) in results.iter().take(display_count).enumerate() {
+
+        for (display_num, (_original_index, item)) in results.iter().take(display_count).enumerate()
+        {
             let preview = item.preview(80);
             let timestamp = item.formatted_timestamp();
             println!("{}. {} [{}]", display_num + 1, preview, timestamp);
         }
-        
+
         if results.len() > display_count {
-            println!("... and {} more results (showing top {})", 
-                results.len() - display_count, display_count);
+            println!(
+                "... and {} more results (showing top {})",
+                results.len() - display_count,
+                display_count
+            );
         }
 
         self.handle_search_selection(results.to_vec()).await
     }
 
-    async fn handle_search_selection(&self, results: Vec<(usize, ClipboardItem)>) -> io::Result<()> {
+    async fn handle_search_selection(
+        &self,
+        results: Vec<(usize, ClipboardItem)>,
+    ) -> io::Result<()> {
         if results.is_empty() {
             return Ok(());
         }
 
         println!("\nActions:");
-        println!("- Type a number (1-{}) to copy that item to clipboard", results.len().min(15));
+        println!(
+            "- Type a number (1-{}) to copy that item to clipboard",
+            results.len().min(15)
+        );
         println!("- Press Enter to continue searching");
         println!("- Type 'q' to quit search");
         print!("> ");
@@ -219,11 +257,11 @@ impl UserInterface {
                 if let Ok(num) = input.parse::<usize>() {
                     if num > 0 && num <= results.len().min(15) {
                         let (original_index, item) = &results[num - 1];
-                        
+
                         println!("\nSelected item {}:", num);
                         println!("Content: {}", item.content);
                         println!("Timestamp: {}", item.formatted_timestamp());
-                        
+
                         // Copy to clipboard
                         match self.manager.copy_item_to_clipboard(*original_index).await {
                             Ok(true) => {
@@ -237,7 +275,10 @@ impl UserInterface {
                             }
                         }
                     } else {
-                        println!("Invalid selection. Please choose a number between 1 and {}.", results.len().min(15));
+                        println!(
+                            "Invalid selection. Please choose a number between 1 and {}.",
+                            results.len().min(15)
+                        );
                     }
                 } else {
                     println!("Invalid input. Please enter a number or 'q' to quit.");
@@ -252,7 +293,7 @@ impl UserInterface {
         println!("Are you sure you want to clear all clipboard history? (y/N):");
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
-        
+
         if input.trim().to_lowercase() == "y" {
             self.manager.clear_history().await?;
             println!("Clipboard history cleared.");
@@ -273,7 +314,7 @@ impl UserInterface {
             println!("\nSelected item {}:", number);
             println!("Content: {}", item.content);
             println!("Timestamp: {}", item.formatted_timestamp());
-            
+
             // Copy to clipboard
             match self.manager.copy_item_to_clipboard(number - 1).await {
                 Ok(true) => {
