@@ -8,6 +8,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 const MAX_HISTORY_SIZE: usize = 1000;
+const MAX_CONTENT_SIZE: usize = 10_000_000; // 10MB limit for individual entries
+const MAX_PREVIEW_LENGTH: usize = 200; // Default preview length for large entries
 
 #[derive(Debug)]
 pub struct ClipboardManager {
@@ -30,7 +32,7 @@ impl ClipboardManager {
         Ok(Self { history, storage })
     }
 
-    #[cfg(test)]
+    // Public method for testing - creates an empty manager
     pub fn new_empty() -> Self {
         let history = Arc::new(Mutex::new(VecDeque::new()));
         // Create a dummy storage for testing
@@ -44,6 +46,18 @@ impl ClipboardManager {
     }
 
     pub async fn add_item(&self, content: String) -> io::Result<()> {
+        // Check content size limit
+        if content.len() > MAX_CONTENT_SIZE {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Content too large: {} bytes (max: {} bytes)", 
+                    content.len(), 
+                    MAX_CONTENT_SIZE
+                )
+            ));
+        }
+
         let mut history = self.history.lock().await;
 
         // Skip duplicates
@@ -144,104 +158,30 @@ impl ClipboardManager {
         self.storage.get_data_file_path()
     }
 
+    /// Get the current content size limits
+    pub fn get_content_limits(&self) -> (usize, usize, usize) {
+        (MAX_CONTENT_SIZE, MAX_HISTORY_SIZE, MAX_PREVIEW_LENGTH)
+    }
+
+    /// Get total size of all clipboard content in bytes
+    pub async fn get_total_content_size(&self) -> usize {
+        let history = self.history.lock().await;
+        history.iter().map(|item| item.content.len()).sum()
+    }
+
+    /// Get statistics about clipboard usage
+    pub async fn get_usage_stats(&self) -> (usize, usize, usize, usize) {
+        let history = self.history.lock().await;
+        let item_count = history.len();
+        let total_size = history.iter().map(|item| item.content.len()).sum();
+        let avg_size = if item_count > 0 { total_size / item_count } else { 0 };
+        let largest_item = history.iter().map(|item| item.content.len()).max().unwrap_or(0);
+        
+        (item_count, total_size, avg_size, largest_item)
+    }
+
     async fn save_history(&self) -> io::Result<()> {
         let history = self.history.lock().await;
         self.storage.save_history(&history).await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_clipboard_manager_creation() {
-        let manager = ClipboardManager::new_empty();
-        assert_eq!(manager.get_history_count().await, 0);
-    }
-
-    #[tokio::test]
-    async fn test_add_item() {
-        let manager = ClipboardManager::new_empty();
-        let content = "Test content".to_string();
-
-        let result = manager.add_item(content.clone()).await;
-        assert!(result.is_ok());
-
-        let history = manager.get_history().await;
-        assert_eq!(history.len(), 1);
-        assert_eq!(history[0].content, content);
-    }
-
-    #[tokio::test]
-    async fn test_duplicate_prevention() {
-        let manager = ClipboardManager::new_empty();
-        let content = "Duplicate content".to_string();
-
-        manager.add_item(content.clone()).await.unwrap();
-        manager.add_item(content.clone()).await.unwrap(); // Should be ignored
-
-        let history = manager.get_history().await;
-        assert_eq!(history.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn test_search_functionality() {
-        let manager = ClipboardManager::new_empty();
-
-        manager.add_item("Hello World".to_string()).await.unwrap();
-        manager
-            .add_item("Rust programming".to_string())
-            .await
-            .unwrap();
-        manager
-            .add_item("Clipboard manager".to_string())
-            .await
-            .unwrap();
-
-        let results = manager.search_history("rust").await;
-        assert_eq!(results.len(), 1);
-        assert!(results[0].1.content.contains("Rust"));
-    }
-
-    #[tokio::test]
-    async fn test_fuzzy_search() {
-        let manager = ClipboardManager::new_empty();
-
-        manager.add_item("Hello World".to_string()).await.unwrap();
-        manager.add_item("Help wanted".to_string()).await.unwrap();
-
-        let results = manager.fuzzy_search_history("helo").await; // typo
-        assert!(!results.is_empty());
-        // Should find "Hello World" despite the typo
-        assert!(results
-            .iter()
-            .any(|(_, item, _)| item.content.contains("Hello")));
-    }
-
-    #[tokio::test]
-    async fn test_clear_history() {
-        let manager = ClipboardManager::new_empty();
-
-        manager.add_item("Item 1".to_string()).await.unwrap();
-        manager.add_item("Item 2".to_string()).await.unwrap();
-
-        assert_eq!(manager.get_history_count().await, 2);
-
-        manager.clear_history().await.unwrap();
-        assert_eq!(manager.get_history_count().await, 0);
-    }
-
-    #[tokio::test]
-    async fn test_history_access() {
-        let manager = ClipboardManager::new_empty();
-
-        manager.add_item("First item".to_string()).await.unwrap();
-        manager.add_item("Second item".to_string()).await.unwrap();
-
-        let history = manager.get_history().await;
-        assert_eq!(history.len(), 2);
-        assert_eq!(history[0].content, "Second item"); // Most recent first
-        assert_eq!(history[1].content, "First item");
     }
 }

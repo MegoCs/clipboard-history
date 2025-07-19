@@ -1,17 +1,12 @@
 [
   {
-    "content": "Clipboard manager",
-    "timestamp": 1752895384,
-    "id": 2
-  },
-  {
-    "content": "Rust programming",
-    "timestamp": 1752895384,
+    "content": "Test item 2",
+    "timestamp": 1752897783,
     "id": 1
   },
   {
-    "content": "Hello World",
-    "timestamp": 1752895384,
+    "content": "Test item 1",
+    "timestamp": 1752897783,
     "id": 0
   }
 ]

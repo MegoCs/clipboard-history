@@ -80,6 +80,9 @@ impl ConsoleInterface {
                 "s" | "search" => {
                     self.search_interactive().await?;
                 }
+                "i" | "info" => {
+                    self.show_usage_info().await;
+                }
                 "" => {
                     self.show_history().await;
                 }
@@ -100,6 +103,7 @@ impl ConsoleInterface {
     async fn show_menu(&self) {
         println!("\n=== Clipboard Manager ===");
         println!("Press Enter to view history, or type a command:");
+        println!("(h=help, s=search, i=info, c=clear, q=quit)");
         print!("> ");
     }
 
@@ -110,6 +114,7 @@ impl ConsoleInterface {
         println!("  h, help     - Show this help");
         println!("  s, search   - Interactive search through clipboard history");
         println!("                (supports both exact text and fuzzy matching)");
+        println!("  i, info     - Show clipboard usage statistics");
         println!("  c, clear    - Clear all history (with confirmation)");
         println!("  q, quit     - Exit the program");
         println!("\nSearch Mode:");
@@ -117,6 +122,10 @@ impl ConsoleInterface {
         println!("  - Fuzzy matching finds items even with typos or partial matches");
         println!("  - Select numbered results to copy them back to clipboard");
         println!("  - Type 'q' in search to return to main menu");
+        println!("\nContent Limits:");
+        println!("  - Maximum single entry: 10 MB");
+        println!("  - Maximum history items: 1,000 entries");
+        println!("  - Large entries show smart previews with size info");
     }
 
     async fn show_history(&self) {
@@ -129,7 +138,7 @@ impl ConsoleInterface {
 
         println!("\n=== Clipboard History ({} items) ===", history.len());
         for (i, item) in history.iter().enumerate().take(20) {
-            let preview = item.preview(80);
+            let preview = item.smart_preview(120);
             let timestamp = item.formatted_timestamp();
             println!("{}. {} [{}]", i + 1, preview, timestamp);
         }
@@ -137,6 +146,23 @@ impl ConsoleInterface {
         if history.len() > 20 {
             println!("... and {} more items", history.len() - 20);
         }
+    }
+
+    async fn show_usage_info(&self) {
+        let (item_count, total_size, avg_size, largest_item) = self.service.get_usage_stats().await;
+        let (max_content, max_history, _) = self.service.get_content_limits();
+        
+        println!("\n=== Clipboard Usage Statistics ===");
+        println!("Items in history: {} / {} max", item_count, max_history);
+        println!("Total content size: {}", format_size(total_size));
+        println!("Average item size: {}", format_size(avg_size));
+        println!("Largest item size: {}", format_size(largest_item));
+        println!("Maximum single item: {}", format_size(max_content));
+        println!("Storage location: {:?}", self.service.get_storage_path());
+        
+        // Show memory usage estimate
+        let estimated_memory = total_size + (item_count * 64); // rough estimate with overhead
+        println!("Estimated memory usage: {}", format_size(estimated_memory));
     }
 
     async fn search_interactive(&self) -> io::Result<()> {
@@ -216,7 +242,7 @@ impl ConsoleInterface {
         let display_count = results.len().min(15);
 
         for (display_num, result) in results.iter().take(display_count).enumerate() {
-            let preview = result.item.preview(70);
+            let preview = result.item.smart_preview(100);
             let timestamp = result.item.formatted_timestamp();
             let score = result.score.unwrap_or(0);
             println!(
@@ -243,7 +269,7 @@ impl ConsoleInterface {
         let display_count = results.len().min(15);
 
         for (display_num, result) in results.iter().take(display_count).enumerate() {
-            let preview = result.item.preview(80);
+            let preview = result.item.smart_preview(100);
             let timestamp = result.item.formatted_timestamp();
             println!("{}. {} [{}]", display_num + 1, preview, timestamp);
         }
@@ -424,5 +450,23 @@ impl ConsoleInterface {
         } else {
             println!("Item {} not found.", number);
         }
+    }
+}
+
+/// Format bytes in a human-readable format
+fn format_size(bytes: usize) -> String {
+    const UNITS: &[&str] = &["B", "KB", "MB", "GB"];
+    let mut size = bytes as f64;
+    let mut unit_index = 0;
+    
+    while size >= 1024.0 && unit_index < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit_index += 1;
+    }
+    
+    if unit_index == 0 {
+        format!("{} {}", size as usize, UNITS[unit_index])
+    } else {
+        format!("{:.1} {}", size, UNITS[unit_index])
     }
 }

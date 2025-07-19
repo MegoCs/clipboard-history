@@ -21,7 +21,56 @@ impl ClipboardItem {
     }
 
     pub fn preview(&self, max_chars: usize) -> String {
-        self.content.chars().take(max_chars).collect::<String>()
+        if self.content.len() <= max_chars {
+            self.content.clone()
+        } else {
+            let truncated = self.content.chars().take(max_chars).collect::<String>();
+            format!("{} [{}...]", truncated, self.format_content_size())
+        }
+    }
+
+    /// Get a smart preview that shows content type and size for large entries
+    pub fn smart_preview(&self, max_chars: usize) -> String {
+        let content_info = self.analyze_content();
+        
+        if self.content.len() <= max_chars {
+            self.content.clone()
+        } else {
+            let truncated = self.content.chars().take(max_chars).collect::<String>();
+            format!("{} [{}, {}...]", truncated, content_info, self.format_content_size())
+        }
+    }
+
+    /// Format content size in human-readable format
+    pub fn format_content_size(&self) -> String {
+        let size = self.content.len();
+        if size < 1024 {
+            format!("{} B", size)
+        } else if size < 1024 * 1024 {
+            format!("{:.1} KB", size as f64 / 1024.0)
+        } else {
+            format!("{:.1} MB", size as f64 / (1024.0 * 1024.0))
+        }
+    }
+
+    /// Analyze content type for better preview
+    fn analyze_content(&self) -> &'static str {
+        let content = &self.content;
+        
+        // Check for common data patterns
+        if content.trim().starts_with('{') && content.trim().ends_with('}') {
+            "JSON"
+        } else if content.trim().starts_with('<') && content.trim().ends_with('>') {
+            "HTML/XML"
+        } else if content.contains("http://") || content.contains("https://") {
+            "URL/Link"
+        } else if content.lines().count() > 10 {
+            "Multi-line"
+        } else if content.chars().all(|c| c.is_ascii_digit() || c.is_whitespace() || c == '.' || c == '-') {
+            "Numeric"
+        } else {
+            "Text"
+        }
     }
 
     pub fn formatted_timestamp(&self) -> String {
@@ -32,48 +81,4 @@ impl ClipboardItem {
             format!("ts:{}", self.timestamp)
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_clipboard_item_creation() {
-        let content = "Test clipboard content".to_string();
-        let item = ClipboardItem::new(content.clone(), 1);
-
-        assert_eq!(item.content, content);
-        assert_eq!(item.id, 1);
-        assert!(item.timestamp > 0);
-    }
-
-    #[test]
-    fn test_clipboard_item_preview() {
-        let long_content = "This is a very long clipboard content that should be truncated when displayed as a preview to the user".to_string();
-        let item = ClipboardItem::new(long_content, 1);
-
-        let preview = item.preview(20);
-        assert_eq!(preview.len(), 20);
-        assert_eq!(preview, "This is a very long ");
-    }
-
-    #[test]
-    fn test_clipboard_item_preview_short_content() {
-        let short_content = "Short".to_string();
-        let item = ClipboardItem::new(short_content.clone(), 1);
-
-        let preview = item.preview(20);
-        assert_eq!(preview, short_content);
-    }
-
-    #[test]
-    fn test_formatted_timestamp() {
-        let item = ClipboardItem::new("test".to_string(), 1);
-        let formatted = item.formatted_timestamp();
-
-        // Should be in format YYYY-MM-DD HH:MM:SS or fallback format
-        assert!(!formatted.is_empty());
-        assert!(formatted.contains("-") || formatted.contains("ts:"));
-    }
-}
+        }

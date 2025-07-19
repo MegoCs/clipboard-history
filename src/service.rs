@@ -25,6 +25,14 @@ impl ClipboardService {
         })
     }
 
+    /// Create a service instance with a provided manager (for testing)
+    pub fn new_with_manager(manager: Arc<ClipboardManager>) -> Self {
+        Self {
+            manager,
+            monitor: None,
+        }
+    }
+
     /// Start background clipboard monitoring
     /// Returns a receiver for clipboard events
     pub fn start_monitoring(&mut self) -> Option<broadcast::Receiver<ClipboardEvent>> {
@@ -78,6 +86,16 @@ impl ClipboardService {
     pub fn get_storage_path(&self) -> &PathBuf {
         self.manager.get_storage_path()
     }
+
+    /// Get content size limits
+    pub fn get_content_limits(&self) -> (usize, usize, usize) {
+        self.manager.get_content_limits()
+    }
+
+    /// Get clipboard usage statistics
+    pub async fn get_usage_stats(&self) -> (usize, usize, usize, usize) {
+        self.manager.get_usage_stats().await
+    }
 }
 
 /// Search result wrapper
@@ -113,47 +131,5 @@ impl ClipboardService {
             .collect();
 
         (exact, fuzzy)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_service_creation() {
-        let service = ClipboardService::new().await;
-        assert!(service.is_ok());
-    }
-
-    #[tokio::test] 
-    async fn test_service_operations() {
-        // Create service with empty manager for testing
-        let manager = Arc::new(ClipboardManager::new_empty());
-        let service = ClipboardService {
-            manager: Arc::clone(&manager),
-            monitor: None,
-        };
-        
-        // Test adding items through the manager
-        assert!(manager.add_item("Test item 1".to_string()).await.is_ok());
-        assert!(manager.add_item("Test item 2".to_string()).await.is_ok());
-        
-        // Test getting history
-        let history = service.get_history().await;
-        assert_eq!(history.len(), 2);
-        assert_eq!(service.get_history_count().await, 2);
-        
-        // Test search
-        let results = service.search("Test").await;
-        assert_eq!(results.len(), 2);
-        
-        // Test fuzzy search
-        let fuzzy_results = service.fuzzy_search("test").await;
-        assert_eq!(fuzzy_results.len(), 2);
-        
-        // Test unified search
-        let (exact, fuzzy) = service.search_unified("Test").await;
-        assert!(!exact.is_empty() || !fuzzy.is_empty());
     }
 }

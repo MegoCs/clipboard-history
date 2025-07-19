@@ -21,7 +21,7 @@ impl Storage {
         Ok(Self { data_file })
     }
 
-    #[cfg(test)]
+    // Public method for testing - allows specifying a custom file path
     pub fn new_with_file(file_path: PathBuf) -> io::Result<Self> {
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent)?;

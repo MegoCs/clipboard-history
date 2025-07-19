@@ -50,7 +50,13 @@ impl ClipboardMonitor {
 
             if let Ok(content) = content {
                 if !content.is_empty() && content != last_content {
-                    let preview = content[..50.min(content.len())].to_string();
+                    // Create a more descriptive preview for large content
+                    let preview = if content.len() > 200 {
+                        let truncated = content[..200.min(content.len())].to_string();
+                        format!("{} [{}...]", truncated, format_bytes(content.len()))
+                    } else {
+                        content[..50.min(content.len())].to_string()
+                    };
                     
                     match self.manager.add_item(content.clone()).await {
                             Ok(()) => {
@@ -87,5 +93,23 @@ impl ClipboardMonitor {
             Ok(content) => Ok(content),
             Err(e) => Err(format!("Clipboard access error: {}", e)),
         }
+    }
+}
+
+/// Format bytes in a human-readable format
+fn format_bytes(bytes: usize) -> String {
+    const UNITS: &[&str] = &["B", "KB", "MB", "GB"];
+    let mut size = bytes as f64;
+    let mut unit_index = 0;
+    
+    while size >= 1024.0 && unit_index < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit_index += 1;
+    }
+    
+    if unit_index == 0 {
+        format!("{} {}", size as usize, UNITS[unit_index])
+    } else {
+        format!("{:.1} {}", size, UNITS[unit_index])
     }
 }
