@@ -14,7 +14,9 @@ jobs:
   test:
     name: Test Suite
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         rust: [stable]
@@ -30,17 +32,10 @@ jobs:
         components: rustfmt, clippy
 
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: Swatinem/rust-cache@v2
       with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+        cache-on-failure: true
 
     - name: Check formatting
       run: cargo fmt --all -- --check
@@ -50,6 +45,8 @@ jobs:
 
     - name: Run tests
       run: cargo test --verbose
+      env:
+        RUST_TEST_TIMEOUT: 300
 
     - name: Build debug
       run: cargo build --verbose
@@ -60,6 +57,7 @@ jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -78,7 +76,9 @@ jobs:
     needs: [test, security-audit]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -108,21 +108,22 @@ jobs:
         targets: ${{ matrix.target }}
 
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: Swatinem/rust-cache@v2
       with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
         key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        cache-on-failure: true
 
     - name: Build release binary
       run: cargo build --release --target ${{ matrix.target }}
 
-    - name: Create artifact directory
+    - name: Create artifact directory (Unix)
+      if: matrix.os != 'windows-latest'
       run: mkdir -p artifacts
+
+    - name: Create artifact directory (Windows)
+      if: matrix.os == 'windows-latest'
+      run: New-Item -ItemType Directory -Force -Path artifacts
+      shell: pwsh
 
     - name: Copy binary to artifacts (Unix)
       if: matrix.os != 'windows-latest'
@@ -132,11 +133,11 @@ jobs:
 
     - name: Copy binary to artifacts (Windows)
       if: matrix.os == 'windows-latest'
-      run: |
-        copy "target\${{ matrix.target }}\release\clipboard-history${{ matrix.binary-extension }}" "artifacts\"
+      run: Copy-Item "target\${{ matrix.target }}\release\clipboard-history${{ matrix.binary-extension }}" "artifacts\"
+      shell: pwsh
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact-name }}
         path: artifacts/clipboard-history${{ matrix.binary-extension }}
@@ -147,6 +148,7 @@ jobs:
     needs: [build-artifacts]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     steps:
     - name: Checkout code
@@ -160,18 +162,18 @@ jobs:
         echo "Version: $VERSION"
     
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: release-artifacts
     
     - name: Create release
       id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.get_version.outputs.version }}-build-${{ github.run_number }}
-        release_name: Clipboard History Manager ${{ steps.get_version.outputs.version }} (Build ${{ github.run_number }})
+        name: Clipboard History Manager ${{ steps.get_version.outputs.version }} (Build ${{ github.run_number }})
         body: |
           ## Clipboard History Manager Release
           
@@ -200,52 +202,18 @@ jobs:
           **Build**: #${{ github.run_number }}
         draft: false
         prerelease: false
-    
-    - name: Upload Linux binary
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: release-artifacts/clipboard-history-linux-x64/clipboard-history
-        asset_name: clipboard-history-linux-x64
-        asset_content_type: application/octet-stream
-    
-    - name: Upload Windows binary
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: release-artifacts/clipboard-history-windows-x64/clipboard-history.exe
-        asset_name: clipboard-history-windows-x64.exe
-        asset_content_type: application/octet-stream
-    
-    - name: Upload macOS Intel binary
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: release-artifacts/clipboard-history-macos-x64/clipboard-history
-        asset_name: clipboard-history-macos-x64
-        asset_content_type: application/octet-stream
-    
-    - name: Upload macOS ARM binary
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: release-artifacts/clipboard-history-macos-arm64/clipboard-history
-        asset_name: clipboard-history-macos-arm64
-        asset_content_type: application/octet-stream
+        files: |
+          release-artifacts/clipboard-history-linux-x64/clipboard-history
+          release-artifacts/clipboard-history-windows-x64/clipboard-history.exe
+          release-artifacts/clipboard-history-macos-x64/clipboard-history
+          release-artifacts/clipboard-history-macos-arm64/clipboard-history
 
   notify:
     name: Notify Status
     needs: [test, security-audit, build-artifacts]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     
     steps:
     - name: Notify Success

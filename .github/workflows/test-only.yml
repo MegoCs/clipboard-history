@@ -1,0 +1,67 @@
+name: Quick Test
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master", "develop" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Quick Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust (stable)
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
+
+    - name: Format check
+      run: cargo fmt --all -- --check
+
+    - name: Clippy check  
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Run tests
+      run: cargo test --verbose
+      timeout-minutes: 10
+
+    - name: Build release
+      run: cargo build --release --verbose
+      timeout-minutes: 10
+
+  result:
+    name: Test Results
+    needs: [test]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Report Success
+      if: needs.test.result == 'success'
+      run: echo "✅ All tests passed on all platforms!"
+      
+    - name: Report Failure
+      if: needs.test.result != 'success'
+      run: |
+        echo "❌ Tests failed!"
+        echo "Status: ${{ needs.test.result }}"
+        exit 1
