@@ -1,5 +1,7 @@
 use crate::clipboard_item::ClipboardItem;
 use crate::storage::Storage;
+use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 use std::collections::VecDeque;
 use std::io;
 use std::sync::Arc;
@@ -67,14 +69,63 @@ impl ClipboardManager {
 
     pub async fn search_history(&self, query: &str) -> Vec<(usize, ClipboardItem)> {
         let history = self.history.lock().await;
-        history
+        
+        // Simple text-based search (case-insensitive contains)
+        let text_matches: Vec<(usize, ClipboardItem)> = history
             .iter()
             .enumerate()
             .filter(|(_, item)| {
                 item.content.to_lowercase().contains(&query.to_lowercase())
             })
             .map(|(idx, item)| (idx, item.clone()))
-            .collect()
+            .collect();
+
+        text_matches
+    }
+
+    pub async fn fuzzy_search_history(&self, query: &str) -> Vec<(usize, ClipboardItem, i64)> {
+        let history = self.history.lock().await;
+        let matcher = SkimMatcherV2::default();
+        
+        let mut fuzzy_matches: Vec<(usize, ClipboardItem, i64)> = history
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, item)| {
+                if let Some(score) = matcher.fuzzy_match(&item.content, query) {
+                    Some((idx, item.clone(), score))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Sort by fuzzy match score (higher is better)
+        fuzzy_matches.sort_by(|a, b| b.2.cmp(&a.2));
+        fuzzy_matches
+    }
+
+    pub async fn copy_item_to_clipboard(&self, index: usize) -> io::Result<bool> {
+        let history = self.history.lock().await;
+        if let Some(item) = history.get(index) {
+            let content = item.content.clone();
+            drop(history);
+            
+            // Use blocking task for clipboard operation
+            let result = tokio::task::spawn_blocking(move || {
+                use clipboard::ClipboardProvider;
+                match clipboard::ClipboardContext::new() {
+                    Ok(mut ctx) => ctx.set_contents(content).is_ok(),
+                    Err(_) => false,
+                }
+            }).await;
+            
+            match result {
+                Ok(success) => Ok(success),
+                Err(_) => Ok(false),
+            }
+        } else {
+            Ok(false)
+        }
     }
 
     pub fn get_storage_path(&self) -> &std::path::PathBuf {

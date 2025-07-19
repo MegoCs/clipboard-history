@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc, TimeZone};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClipboardItem {
@@ -24,7 +25,11 @@ impl ClipboardItem {
     }
 
     pub fn formatted_timestamp(&self) -> String {
-        // Simple timestamp formatting - you can enhance this later
-        format!("ts:{}", self.timestamp)
+        if let Some(datetime) = Utc.timestamp_opt(self.timestamp as i64, 0).single() {
+            let local_time: DateTime<chrono::Local> = datetime.into();
+            local_time.format("%Y-%m-%d %H:%M:%S").to_string()
+        } else {
+            format!("ts:{}", self.timestamp)
+        }
     }
 }

@@ -41,7 +41,9 @@ src/
 - **Public API**:
   - `add_item()`: Add new clipboard content
   - `get_history()`: Retrieve all items
-  - `search_history()`: Find items by content
+  - `search_history()`: Find items by exact text matching
+  - `fuzzy_search_history()`: Find items with fuzzy matching and relevance scoring
+  - `copy_item_to_clipboard()`: Copy historical item back to system clipboard
   - `clear_history()`: Remove all items
   - `get_item_by_index()`: Get specific item
 
@@ -77,10 +79,12 @@ src/
   - Input validation and error handling
   - Contextual help and feedback
 - **Key Features**:
-  - Interactive search with real-time results
+  - Interactive search with both fuzzy and text matching
+  - Search loop mode for multiple queries without restart
   - Paginated history display (20 items max)
-  - Item selection by number
+  - Item selection by number with instant clipboard copy
   - Confirmation dialogs for destructive actions
+  - Human-readable timestamps and content previews
 
 ## Data Flow Architecture
 
@@ -126,8 +130,8 @@ The modular architecture supports easy extension:
 
 1. **New Storage Backends**: Implement additional storage providers
 2. **Enhanced UI**: Add terminal UI libraries or web interface
-3. **Advanced Search**: Implement regex or full-text search
-4. **Clipboard Types**: Support images, files, or rich content
+3. **Advanced Search**: ✅ Implemented fuzzy matching and dual search modes
+4. **Clipboard Copy-back**: ✅ Implemented item copying back to system clipboard
 5. **Sync Features**: Add cloud synchronization capabilities
 6. **Plugins**: Support for custom content processors or filters
 

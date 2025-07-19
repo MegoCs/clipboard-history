@@ -6,8 +6,9 @@ A powerful, searchable clipboard history manager written in Rust that runs in th
 
 - **Background Monitoring**: Automatically captures clipboard changes without user intervention
 - **Persistent Storage**: Saves clipboard history to disk and restores it on startup  
-- **Fuzzy Search**: Fast, intelligent search through your clipboard history
-- **Simple Interface**: Clean, number-based interface for easy selection
+- **Advanced Search**: Both exact text matching and fuzzy search capabilities
+- **Interactive Interface**: Clean, number-based interface for easy selection
+- **Copy-to-Clipboard**: Select any historical item to copy it back to clipboard
 - **Cross-Platform**: Works on Windows, macOS, and Linux
 - **Lightweight**: Minimal resource usage while running in the background
 
@@ -41,9 +42,28 @@ The application will:
 
 When viewing clipboard history:
 - **Type a number (1-20)**: Copy that item to clipboard and return to main menu
-- **Type 's' or 'search'**: Enter search mode
+- **Type 's' or 'search'**: Enter interactive search mode
 - **Type 'c' or 'clear'**: Clear all clipboard history
 - **Type 'q' or 'quit'**: Return to main menu
+
+### Interactive Search Mode
+
+The search system provides two types of matching:
+
+**Fuzzy Search** (default):
+- Finds items even with typos or partial matches
+- Results are ranked by relevance score
+- Example: searching "hello" might find "Hello World!" or "helo there"
+
+**Text Search** (fallback):
+- Exact substring matching (case-insensitive)
+- Reliable for precise searches
+
+**Search Commands**:
+- **Enter search term**: Find matching clipboard items
+- **Type a number**: Copy that search result to clipboard
+- **Type 'h' or 'help'**: Show search help
+- **Type 'q' or 'quit'**: Exit search mode
 
 ### Search Mode
 
@@ -61,7 +81,9 @@ When searching:
 4. **See your history** with timestamps and previews
 5. **Type '1'** to copy the first item back to clipboard
 6. **Type 's'** to search through your history
-7. **Type 'q'** to return to main menu
+7. **Enter search terms** like "password" or "email" to find specific items
+8. **Select numbered results** to copy them back to clipboard
+9. **Type 'q'** to return to main menu
 
 ## Features in Detail
 
@@ -75,7 +97,15 @@ Your clipboard history is saved to:
 - **Linux**: `~/.local/share/clipboard-history/history.json`
 
 ### Smart Search
-The search function uses fuzzy matching, so you can find items even with partial matches or typos.
+The search function offers two modes:
+1. **Fuzzy matching** - finds items even with typos or partial matches, ranked by relevance
+2. **Text matching** - exact substring search for precise queries
+
+Search supports:
+- Case-insensitive matching
+- Partial word matching
+- Typo tolerance (fuzzy search)
+- Relevance scoring and ranking
 
 ## Configuration
 
@@ -143,9 +173,10 @@ The app checks clipboard every 500ms. For better performance on slower systems, 
 - q → Back to main
 
 **Search Mode:**
-- 1-20 → Copy search result
+- Enter → Search for items
+- 1-15 → Copy search result
+- h → Search help
 - q → Exit search
-- b → Back to history
 
 ## License
 
