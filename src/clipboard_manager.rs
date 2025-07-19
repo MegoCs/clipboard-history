@@ -75,11 +75,6 @@ impl ClipboardManager {
         history.len()
     }
 
-    pub async fn get_item_by_index(&self, index: usize) -> Option<ClipboardItem> {
-        let history = self.history.lock().await;
-        history.get(index).cloned()
-    }
-
     pub async fn clear_history(&self) -> io::Result<()> {
         let mut history = self.history.lock().await;
         history.clear();
@@ -238,21 +233,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_item_by_index() {
+    async fn test_history_access() {
         let manager = ClipboardManager::new_empty();
 
         manager.add_item("First item".to_string()).await.unwrap();
         manager.add_item("Second item".to_string()).await.unwrap();
 
-        let item = manager.get_item_by_index(0).await;
-        assert!(item.is_some());
-        assert_eq!(item.unwrap().content, "Second item"); // Most recent first
-
-        let item = manager.get_item_by_index(1).await;
-        assert!(item.is_some());
-        assert_eq!(item.unwrap().content, "First item");
-
-        let item = manager.get_item_by_index(999).await;
-        assert!(item.is_none());
+        let history = manager.get_history().await;
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].content, "Second item"); // Most recent first
+        assert_eq!(history[1].content, "First item");
     }
 }

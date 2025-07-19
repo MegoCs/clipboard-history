@@ -54,16 +54,6 @@ impl ClipboardService {
         self.manager.get_history_count().await
     }
 
-    /// Get a specific item by index
-    pub async fn get_item_by_index(&self, index: usize) -> Option<ClipboardItem> {
-        self.manager.get_item_by_index(index).await
-    }
-
-    /// Add a new item to the clipboard history manually
-    pub async fn add_item(&self, content: String) -> io::Result<()> {
-        self.manager.add_item(content).await
-    }
-
     /// Search clipboard history with exact text matching
     pub async fn search(&self, query: &str) -> Vec<(usize, ClipboardItem)> {
         self.manager.search_history(query).await
@@ -87,22 +77,6 @@ impl ClipboardService {
     /// Get the storage file path
     pub fn get_storage_path(&self) -> &PathBuf {
         self.manager.get_storage_path()
-    }
-}
-
-/// Result types for service operations
-#[derive(Debug)]
-pub enum ServiceResult<T> {
-    Success(T),
-    Error(String),
-}
-
-impl<T> From<io::Result<T>> for ServiceResult<T> {
-    fn from(result: io::Result<T>) -> Self {
-        match result {
-            Ok(value) => ServiceResult::Success(value),
-            Err(e) => ServiceResult::Error(e.to_string()),
-        }
     }
 }
 
@@ -154,11 +128,16 @@ mod tests {
 
     #[tokio::test] 
     async fn test_service_operations() {
-        let service = ClipboardService::new().await.unwrap();
+        // Create service with empty manager for testing
+        let manager = Arc::new(ClipboardManager::new_empty());
+        let service = ClipboardService {
+            manager: Arc::clone(&manager),
+            monitor: None,
+        };
         
-        // Test adding items
-        assert!(service.add_item("Test item 1".to_string()).await.is_ok());
-        assert!(service.add_item("Test item 2".to_string()).await.is_ok());
+        // Test adding items through the manager
+        assert!(manager.add_item("Test item 1".to_string()).await.is_ok());
+        assert!(manager.add_item("Test item 2".to_string()).await.is_ok());
         
         // Test getting history
         let history = service.get_history().await;

@@ -7,10 +7,9 @@ use crate::clipboard_manager::ClipboardManager;
 
 #[derive(Debug, Clone)]
 pub enum ClipboardEvent {
-    ItemAdded { content: String, preview: String },
+    ItemAdded { preview: String },
     Error { message: String },
     Started,
-    Stopped,
 }
 
 pub struct ClipboardMonitor {
@@ -54,12 +53,11 @@ impl ClipboardMonitor {
                     let preview = content[..50.min(content.len())].to_string();
                     
                     match self.manager.add_item(content.clone()).await {
-                        Ok(()) => {
-                            let _ = self.event_sender.send(ClipboardEvent::ItemAdded {
-                                content: content.clone(),
-                                preview,
-                            });
-                        }
+                            Ok(()) => {
+                                let _ = self.event_sender.send(ClipboardEvent::ItemAdded {
+                                    preview,
+                                });
+                            }
                         Err(e) => {
                             let _ = self.event_sender.send(ClipboardEvent::Error {
                                 message: format!("Error adding clipboard item: {}", e),

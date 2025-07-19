@@ -46,7 +46,7 @@ impl ConsoleInterface {
 
     fn handle_clipboard_event(event: ClipboardEvent) {
         match event {
-            ClipboardEvent::ItemAdded { preview, .. } => {
+            ClipboardEvent::ItemAdded { preview } => {
                 println!("New clipboard: {:?}", preview);
             }
             ClipboardEvent::Error { message } => {
@@ -54,9 +54,6 @@ impl ConsoleInterface {
             }
             ClipboardEvent::Started => {
                 println!("Clipboard monitoring started");
-            }
-            ClipboardEvent::Stopped => {
-                println!("Clipboard monitoring stopped");
             }
         }
     }
