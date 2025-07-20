@@ -53,10 +53,7 @@ impl ClipboardManager {
         if item_size > MAX_CONTENT_SIZE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!(
-                    "Content too large: {} bytes (max: {} bytes)",
-                    item_size, MAX_CONTENT_SIZE
-                ),
+                format!("Content too large: {item_size} bytes (max: {MAX_CONTENT_SIZE} bytes)"),
             ));
         }
 

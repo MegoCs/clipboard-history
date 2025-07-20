@@ -174,7 +174,7 @@ impl ClipboardItem {
                 format,
                 ..
             } => {
-                format!("{}x{} {:?} image", width, height, format)
+                format!("{width}x{height} {format:?} image")
             }
             ClipboardContentType::Html { plain_text, html } => {
                 plain_text.as_ref().unwrap_or(html).clone()
@@ -187,7 +187,7 @@ impl ClipboardItem {
                 }
             }
             ClipboardContentType::Other { content_type, .. } => {
-                format!("Binary data ({})", content_type)
+                format!("Binary data ({content_type})")
             }
         }
     }
