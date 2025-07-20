@@ -77,7 +77,7 @@ impl PopupClipboardUI {
                 Ok(None)
             }
             Err(e) => {
-                println!("❌ eframe error: {}", e);
+                println!("❌ eframe error: {e}");
                 Err(e)
             }
         }
@@ -279,8 +279,8 @@ impl PopupApp {
                             println!("✅ Item copied to clipboard!");
                         }
                         Err(e) => {
-                            eprintln!("❌ Failed to copy item to clipboard: {}", e);
-                            eprintln!("   Item preview: {}", item_preview);
+                            eprintln!("❌ Failed to copy item to clipboard: {e}");
+                            eprintln!("   Item preview: {item_preview}");
                             eprintln!("   This may be due to corrupted image data or unsupported format.");
 
                             // Try to provide helpful information
@@ -628,6 +628,7 @@ impl eframe::App for PopupApp {
 
 /// Global hotkey manager for the popup
 pub struct HotkeyManager {
+    #[allow(dead_code)] // Used in Windows-specific code
     hotkey_id: u32,
 }
 
