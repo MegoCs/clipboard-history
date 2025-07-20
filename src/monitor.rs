@@ -81,8 +81,11 @@ impl ClipboardMonitor {
 
     async fn get_clipboard_content(&self) -> Result<String, String> {
         let result = tokio::task::spawn_blocking(|| {
-            let mut clipboard = arboard::Clipboard::new().map_err(|_| "Failed to access clipboard")?;
-            clipboard.get_text().map_err(|_| "Failed to get clipboard text")
+            let mut clipboard =
+                arboard::Clipboard::new().map_err(|_| "Failed to access clipboard")?;
+            clipboard
+                .get_text()
+                .map_err(|_| "Failed to get clipboard text")
         })
         .await;
 

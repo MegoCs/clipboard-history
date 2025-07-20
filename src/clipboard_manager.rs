@@ -138,8 +138,11 @@ impl ClipboardManager {
 
             // Use blocking task for clipboard operation
             let result = tokio::task::spawn_blocking(move || {
-                let mut clipboard = arboard::Clipboard::new().map_err(|_| "Failed to access clipboard")?;
-                clipboard.set_text(content).map_err(|_| "Failed to set clipboard text")
+                let mut clipboard =
+                    arboard::Clipboard::new().map_err(|_| "Failed to access clipboard")?;
+                clipboard
+                    .set_text(content)
+                    .map_err(|_| "Failed to set clipboard text")
             })
             .await;
 
