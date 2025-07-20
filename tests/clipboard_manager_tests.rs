@@ -58,8 +58,8 @@ async fn test_search_functionality() {
 
     let results = manager.search_history("rust").await;
     assert_eq!(results.len(), 1);
-    // Check if the item contains "Rust" using searchable_content
-    let searchable = results[0].1.searchable_content();
+    // Check if the item contains "Rust" using display_content
+    let searchable = results[0].1.display_content();
     assert!(searchable.contains("Rust"));
 }
 
@@ -80,7 +80,7 @@ async fn test_fuzzy_search() {
     assert!(!results.is_empty());
     // Should find "Hello World" despite the typo
     assert!(results.iter().any(|(_, item, _)| {
-        let searchable = item.searchable_content();
+        let searchable = item.display_content();
         searchable.contains("Hello")
     }));
 }
@@ -120,9 +120,10 @@ async fn test_history_access() {
     let history = manager.get_history().await;
     assert_eq!(history.len(), 2);
 
-    // Most recent first - check using searchable_content
-    let first_searchable = history[0].searchable_content();
-    let second_searchable = history[1].searchable_content();
+        
+    // Most recent first - check using display_content
+    let first_searchable = history[0].display_content();
+    let second_searchable = history[1].display_content();
     assert!(first_searchable.contains("Second item"));
     assert!(second_searchable.contains("First item"));
 }

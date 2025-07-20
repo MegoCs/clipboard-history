@@ -80,12 +80,6 @@ impl ClipboardManager {
         self.save_history().await
     }
 
-    // Keep the old method for backward compatibility
-    pub async fn add_item(&self, content: String) -> io::Result<()> {
-        let item = ClipboardItem::new_text(content);
-        self.add_clipboard_item(item).await
-    }
-
     pub async fn get_history(&self) -> Vec<ClipboardItem> {
         let history = self.history.lock().await;
         history.iter().cloned().collect()
@@ -189,7 +183,7 @@ impl ClipboardManager {
                     ClipboardContentType::Files(paths) => {
                         // Convert string paths to PathBuf
                         let _path_bufs: Vec<std::path::PathBuf> =
-                            paths.iter().map(|p| std::path::PathBuf::from(p)).collect();
+                            paths.iter().map(std::path::PathBuf::from).collect();
                         clipboard
                             .set_text(paths.join("\n"))
                             .map_err(|_| "Failed to set file paths as text")?;

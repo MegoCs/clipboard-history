@@ -1,4 +1,5 @@
 use clipboard_history::clipboard_manager::ClipboardManager;
+use clipboard_history::clipboard_item::ClipboardItem;
 use clipboard_history::service::ClipboardService;
 use std::sync::Arc;
 
@@ -15,8 +16,8 @@ async fn test_service_operations() {
     let service = ClipboardService::new_with_manager(manager.clone());
 
     // Test adding items through the manager
-    assert!(manager.add_item("Test item 1".to_string()).await.is_ok());
-    assert!(manager.add_item("Test item 2".to_string()).await.is_ok());
+    assert!(manager.add_clipboard_item(ClipboardItem::new_text("Test item 1".to_string())).await.is_ok());
+    assert!(manager.add_clipboard_item(ClipboardItem::new_text("Test item 2".to_string())).await.is_ok());
 
     // Test getting history
     let history = service.get_history().await;

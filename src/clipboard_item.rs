@@ -118,28 +118,6 @@ impl ClipboardItem {
         self.smart_preview(100)
     }
 
-    /// Get the content as a searchable string
-    pub fn searchable_content(&self) -> String {
-        match &self.content {
-            ClipboardContentType::Text(text) => text.clone(),
-            ClipboardContentType::Image {
-                width,
-                height,
-                format,
-                ..
-            } => {
-                format!("Image {}x{} {:?}", width, height, format)
-            }
-            ClipboardContentType::Html { html, plain_text } => {
-                plain_text.as_ref().unwrap_or(html).clone()
-            }
-            ClipboardContentType::Files(files) => files.join(" "),
-            ClipboardContentType::Other { content_type, .. } => {
-                format!("Binary data: {}", content_type)
-            }
-        }
-    }
-
     /// Get content type as string for display
     pub fn content_type_name(&self) -> &'static str {
         match &self.content {
@@ -257,7 +235,7 @@ impl ClipboardItem {
                     .all(|c| c.is_ascii_digit() || c.is_whitespace() || c == '.' || c == '-')
                 {
                     "Numeric"
-                } else if content.chars().any(|c| !c.is_ascii()) {
+                } else if !content.is_ascii() {
                     "Unicode/Emoji"
                 } else {
                     "Text"
