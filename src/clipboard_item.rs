@@ -113,54 +113,15 @@ impl ClipboardItem {
         self.estimate_size()
     }
 
-    /// Get a preview of the content with default length
-    pub fn get_preview(&self) -> String {
-        self.smart_preview(100)
-    }
-
-    /// Get content type as string for display
-    pub fn content_type_name(&self) -> &'static str {
-        match &self.content {
-            ClipboardContentType::Text(_) => "Text",
-            ClipboardContentType::Image { .. } => "Image",
-            ClipboardContentType::Html { .. } => "HTML",
-            ClipboardContentType::Files(_) => "Files",
-            ClipboardContentType::Other { .. } => "Binary",
-        }
-    }
-
-    #[allow(dead_code)] // Used by tests and might be used by future UI implementations
-    pub fn preview(&self, max_chars: usize) -> String {
-        let content_str = self.display_content();
-        if content_str.len() <= max_chars {
-            format!("[{}] {}", self.content_type_name(), content_str)
-        } else {
-            let truncated = content_str.chars().take(max_chars).collect::<String>();
-            format!(
-                "[{}] {} [{}...]",
-                self.content_type_name(),
-                truncated,
-                self.format_content_size()
-            )
-        }
-    }
-
-    /// Get a smart preview that shows content type and size for large entries
-    pub fn smart_preview(&self, max_chars: usize) -> String {
-        let content_info = self.analyze_content();
+    /// Get clean preview without type prefix for search and display
+    pub fn clean_preview(&self, max_chars: usize) -> String {
         let content_str = self.display_content();
 
         if content_str.len() <= max_chars {
-            format!("[{}] {}", self.content_type_name(), content_str)
+            content_str
         } else {
             let truncated = content_str.chars().take(max_chars).collect::<String>();
-            format!(
-                "[{}] {} [{}, {}...]",
-                self.content_type_name(),
-                truncated,
-                content_info,
-                self.format_content_size()
-            )
+            format!("{}...", truncated)
         }
     }
 
@@ -192,18 +153,6 @@ impl ClipboardItem {
         }
     }
 
-    /// Format content size in human-readable format
-    pub fn format_content_size(&self) -> String {
-        let size = self.estimate_size();
-        if size < 1024 {
-            format!("{size} B")
-        } else if size < 1024 * 1024 {
-            format!("{:.1} KB", size as f64 / 1024.0)
-        } else {
-            format!("{:.1} MB", size as f64 / (1024.0 * 1024.0))
-        }
-    }
-
     /// Estimate memory size of the content
     fn estimate_size(&self) -> usize {
         match &self.content {
@@ -215,53 +164,5 @@ impl ClipboardItem {
             ClipboardContentType::Files(files) => files.iter().map(|f| f.len()).sum::<usize>(),
             ClipboardContentType::Other { content_type, data } => content_type.len() + data.len(),
         }
-    }
-
-    /// Analyze content type for better preview
-    fn analyze_content(&self) -> &'static str {
-        match &self.content {
-            ClipboardContentType::Text(content) => {
-                // Check for common data patterns
-                if content.trim().starts_with('{') && content.trim().ends_with('}') {
-                    "JSON"
-                } else if content.trim().starts_with('<') && content.trim().ends_with('>') {
-                    "HTML/XML"
-                } else if content.contains("http://") || content.contains("https://") {
-                    "URL/Link"
-                } else if content.lines().count() > 10 {
-                    "Multi-line"
-                } else if content
-                    .chars()
-                    .all(|c| c.is_ascii_digit() || c.is_whitespace() || c == '.' || c == '-')
-                {
-                    "Numeric"
-                } else if !content.is_ascii() {
-                    "Unicode/Emoji"
-                } else {
-                    "Text"
-                }
-            }
-            ClipboardContentType::Image { width, height, .. } => {
-                if *width > 1920 || *height > 1080 {
-                    "Large Image"
-                } else {
-                    "Image"
-                }
-            }
-            ClipboardContentType::Html { .. } => "Rich Text",
-            ClipboardContentType::Files(files) => {
-                if files.len() == 1 {
-                    "Single File"
-                } else {
-                    "Multiple Files"
-                }
-            }
-            ClipboardContentType::Other { .. } => "Binary Data",
-        }
-    }
-
-    pub fn formatted_timestamp(&self) -> String {
-        let local_time: DateTime<chrono::Local> = self.timestamp.into();
-        local_time.format("%Y-%m-%d %H:%M:%S").to_string()
     }
 }

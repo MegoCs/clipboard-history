@@ -15,6 +15,9 @@ A **powerful, intelligent clipboard history manager** written in Rust with advan
 - **🎯 Smart Previews**: Context-aware content previews with size information
 - **📊 Usage Analytics**: Track clipboard usage patterns and statistics
 - **🌐 Cross-Platform**: Works seamlessly on Windows, macOS, and Linux
+- **🎨 Dual UI Modes**: Choose between console interface and modern popup UI
+- **⌨️ Global Hotkey**: Quick access popup with `Ctrl+Shift+V` (Windows)
+- **🖱️ Multi-Type Support**: Handles text, images, HTML, files, and binary data
 
 ### 🧠 **Advanced Search Features**
 - **Fuzzy Matching**: Find items even with typos (`"passowrd"` finds `"password"`)
@@ -71,26 +74,31 @@ cargo build --release
 - **Windows**: Windows 10+ (no additional dependencies)
 - **macOS**: macOS 10.15+ (both Intel and Apple Silicon supported)
 
-## Usage
+## 🚀 Usage
 
-### Starting the Application
+The clipboard manager features a modern popup interface with global hotkey support:
+
 ```bash
 cargo run
 ```
 
-The application will:
-1. Start monitoring your clipboard in the background
-2. Display a welcome message and wait for your commands
+**Key Features:**
+- **⌨️ Global Hotkey**: Press `Ctrl+Shift+V` anywhere to open the popup
+- **🎯 Cursor Positioning**: Popup appears at your current cursor location  
+- **🔍 Real-time Search**: Search box with instant filtering
+- **⬆️⬇️ Arrow Navigation**: Navigate through items with keyboard
+- **🖱️ Mouse Support**: Click to select items
+- **✨ Modern UI**: Clean, minimalist popup interface
+- **⚡ Fast Access**: Instant clipboard access without switching windows
+- **🖼️ Multi-type Support**: Handle text, images, HTML, and files seamlessly
 
-### Main Menu Commands
-
-- **Press Enter**: Open clipboard history viewer
-- **Type 'exit'**: Quit the application
-- **Ctrl+C**: Force quit
-
-### History Viewer Interface
-
-When viewing clipboard history:
+**Popup Controls:**
+- **Type in search box**: Filter clipboard history in real-time
+- **↑/↓ Arrow Keys**: Navigate through items  
+- **Enter**: Select and copy the highlighted item
+- **Double-click**: Select and copy any item
+- **Escape**: Close the popup
+- **Close button (×)**: Close the popup
 - **Type a number (1-20)**: Copy that item to clipboard and return to main menu
 - **Type 's' or 'search'**: Enter interactive search mode
 - **Type 'c' or 'clear'**: Clear all clipboard history
@@ -119,26 +127,17 @@ The search system provides two types of matching:
 
 When searching:
 - **Enter search term**: Find items containing your search text (fuzzy matching)
-- **Type a number**: Copy that search result to clipboard
-- **Type 'q' or 'quit'**: Exit search mode
-- **Type 'b' or 'back'**: Return to main history view
+## 🎯 How It Works
 
-## Example Usage
+1. **Start the app**: `cargo run`  
+2. **Copy content** in any application (Ctrl+C)
+3. **Press Ctrl+Shift+V** to open the popup
+4. **Search or navigate** to find your content
+5. **Select and copy** the item you want
 
-1. **Start the app**: `cargo run`
-2. **Copy some text** in any application (Ctrl+C)
-3. **Press Enter** in the clipboard manager
-4. **See your history** with timestamps and previews
-5. **Type '1'** to copy the first item back to clipboard
-6. **Type 's'** to search through your history
-7. **Enter search terms** like "password" or "email" to find specific items
-8. **Select numbered results** to copy them back to clipboard
-9. **Type 'q'** to return to main menu
+The clipboard manager continuously monitors your clipboard and automatically saves new content with smart deduplication.
 
-## Features in Detail
-
-### Background Monitoring
-The app continuously monitors your clipboard every 500ms and automatically saves any new text you copy.
+## 🔧 Configuration & Storage
 
 ### Persistent Storage
 Your clipboard history is saved to:
@@ -147,21 +146,24 @@ Your clipboard history is saved to:
 - **Linux**: `~/.local/share/clipboard-history/history.json`
 
 ### Smart Search
-The search function offers two modes:
+The search function offers multiple modes:
 1. **Fuzzy matching** - finds items even with typos or partial matches, ranked by relevance
-2. **Text matching** - exact substring search for precise queries
+2. **Exact matching** - precise substring search for specific queries
+3. **Real-time filtering** - instant results as you type
 
-Search supports:
-- Case-insensitive matching
-- Partial word matching
-- Typo tolerance (fuzzy search)
-- Relevance scoring and ranking
+Search features:
+- ✅ Case-insensitive matching
+- ✅ Partial word matching  
+- ✅ Typo tolerance (fuzzy search)
+- ✅ Relevance scoring and ranking
+- ✅ Content type detection (JSON, URLs, code)
 
-## Configuration
+### Default Limits
+- **History size**: 1,000 items (configurable)
+- **Content size**: 10MB per item
+- **Monitoring frequency**: Real-time clipboard events
 
-The application stores up to 1,000 clipboard items by default. You can modify this limit by changing the `max_items` value in the `ClipboardManager::new()` function in `src/main.rs`.
-
-## Building for Production
+## 🏗️ Building for Production
 
 To create an optimized executable:
 ```bash
@@ -169,7 +171,7 @@ cargo build --release
 ```
 
 The executable will be located at:
-- Windows: `target/release/clipboard-history.exe`
+- **Windows**: `target/release/clipboard-history.exe`
 - Unix: `target/release/clipboard-history`
 
 ## Running Automatically

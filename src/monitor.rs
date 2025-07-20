@@ -8,8 +8,8 @@ use crate::clipboard_manager::ClipboardManager;
 
 #[derive(Debug, Clone)]
 pub enum ClipboardEvent {
-    ItemAdded { preview: String },
-    Error { message: String },
+    ItemAdded,
+    Error,
     Started,
 }
 
@@ -55,26 +55,21 @@ impl ClipboardMonitor {
                     let content_hash = self.create_content_hash(&clipboard_item);
 
                     if !content_hash.is_empty() && content_hash != last_content_hash {
-                        // Create a preview for the event
-                        let preview = clipboard_item.smart_preview(100);
-
                         match self.manager.add_clipboard_item(clipboard_item).await {
                             Ok(()) => {
                                 let _ = self
                                     .event_sender
-                                    .send(ClipboardEvent::ItemAdded { preview });
+                                    .send(ClipboardEvent::ItemAdded);
                             }
-                            Err(e) => {
-                                let _ = self.event_sender.send(ClipboardEvent::Error {
-                                    message: format!("Error adding clipboard item: {e}"),
-                                });
+                            Err(_) => {
+                                let _ = self.event_sender.send(ClipboardEvent::Error);
                             }
                         }
                         last_content_hash = content_hash;
                     }
                 }
-                Err(e) => {
-                    let _ = self.event_sender.send(ClipboardEvent::Error { message: e });
+                Err(_) => {
+                    let _ = self.event_sender.send(ClipboardEvent::Error);
                 }
             }
 
@@ -191,5 +186,22 @@ impl ClipboardMonitor {
             image::ImageFormat::Png,
         )?;
         Ok(png_data)
+    }
+
+    /// Convert PNG bytes back to RGBA format
+    pub fn png_to_rgba(
+        png_data: &[u8],
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+        use image::ImageReader;
+        
+        let reader = ImageReader::new(std::io::Cursor::new(png_data))
+            .with_guessed_format()
+            .map_err(|e| format!("Failed to read image format: {}", e))?;
+            
+        let img = reader.decode()
+            .map_err(|e| format!("Failed to decode image: {}", e))?;
+            
+        let rgba_img = img.to_rgba8();
+        Ok(rgba_img.into_raw())
     }
 }

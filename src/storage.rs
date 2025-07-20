@@ -32,10 +32,6 @@ impl Storage {
         })
     }
 
-    pub fn get_data_file_path(&self) -> &PathBuf {
-        &self.data_file
-    }
-
     pub async fn load_history(&self) -> io::Result<VecDeque<ClipboardItem>> {
         if self.data_file.exists() {
             let content = fs::read_to_string(&self.data_file)?;

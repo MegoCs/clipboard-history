@@ -1,4 +1,5 @@
 use crate::clipboard_item::{ClipboardContentType, ClipboardItem};
+use crate::monitor::ClipboardMonitor;
 use crate::storage::Storage;
 use base64::prelude::*;
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -10,7 +11,6 @@ use tokio::sync::Mutex;
 
 const MAX_HISTORY_SIZE: usize = 1000;
 const MAX_CONTENT_SIZE: usize = 10_000_000; // 10MB limit for individual entries
-const MAX_PREVIEW_LENGTH: usize = 200; // Default preview length for large entries
 
 #[derive(Debug)]
 pub struct ClipboardManager {
@@ -82,28 +82,16 @@ impl ClipboardManager {
         history.iter().cloned().collect()
     }
 
-    pub async fn get_history_count(&self) -> usize {
-        let history = self.history.lock().await;
-        history.len()
-    }
-
-    pub async fn clear_history(&self) -> io::Result<()> {
-        let mut history = self.history.lock().await;
-        history.clear();
-        drop(history);
-        self.save_history().await
-    }
-
     pub async fn search_history(&self, query: &str) -> Vec<(usize, ClipboardItem)> {
         let history = self.history.lock().await;
 
-        // Search across different content types
+        // Search across different content types using display_content (without type prefix)
         let matches: Vec<(usize, ClipboardItem)> = history
             .iter()
             .enumerate()
             .filter(|(_, item)| {
-                let preview = item.get_preview();
-                preview.to_lowercase().contains(&query.to_lowercase())
+                let content = item.display_content();
+                content.to_lowercase().contains(&query.to_lowercase())
             })
             .map(|(idx, item)| (idx, item.clone()))
             .collect();
@@ -119,9 +107,9 @@ impl ClipboardManager {
             .iter()
             .enumerate()
             .filter_map(|(idx, item)| {
-                let preview = item.get_preview();
+                let content = item.display_content();
                 matcher
-                    .fuzzy_match(&preview, query)
+                    .fuzzy_match(&content, query)
                     .map(|score| (idx, item.clone(), score))
             })
             .collect();
@@ -148,19 +136,32 @@ impl ClipboardManager {
                             .set_text(text.clone())
                             .map_err(|_| "Failed to set clipboard text")?;
                     }
-                    ClipboardContentType::Image { data, .. } => {
-                        // Try to decode base64 image data
-                        if let Ok(img_data) = BASE64_STANDARD.decode(data) {
-                            let img = arboard::ImageData {
-                                width: 0, // arboard will detect dimensions
-                                height: 0,
-                                bytes: std::borrow::Cow::Borrowed(&img_data),
-                            };
-                            clipboard
-                                .set_image(img)
-                                .map_err(|_| "Failed to set clipboard image")?;
+                    ClipboardContentType::Image { data, width, height, .. } => {
+                        // Decode base64 PNG data and convert back to RGBA for clipboard
+                        if let Ok(png_data) = BASE64_STANDARD.decode(data) {
+                            // Validate that we have valid dimensions
+                            if *width > 0 && *height > 0 {
+                                // Convert PNG back to RGBA format for arboard
+                                match ClipboardMonitor::png_to_rgba(&png_data) {
+                                    Ok(rgba_data) => {
+                                        let img = arboard::ImageData {
+                                            width: *width as usize,
+                                            height: *height as usize,
+                                            bytes: std::borrow::Cow::Owned(rgba_data),
+                                        };
+                                        clipboard
+                                            .set_image(img)
+                                            .map_err(|e| format!("Failed to set clipboard image: {}", e))?;
+                                    }
+                                    Err(e) => {
+                                        return Err(format!("Failed to decode image data: {}", e));
+                                    }
+                                }
+                            } else {
+                                return Err("Invalid image dimensions: width and height must be greater than 0".to_string());
+                            }
                         } else {
-                            return Err("Invalid image data");
+                            return Err("Invalid base64 image data".to_string());
                         }
                     }
                     ClipboardContentType::Html { html, plain_text } => {
@@ -216,41 +217,6 @@ impl ClipboardManager {
         } else {
             Ok(false)
         }
-    }
-
-    pub fn get_storage_path(&self) -> &std::path::PathBuf {
-        self.storage.get_data_file_path()
-    }
-
-    /// Get the current content size limits
-    pub fn get_content_limits(&self) -> (usize, usize, usize) {
-        (MAX_CONTENT_SIZE, MAX_HISTORY_SIZE, MAX_PREVIEW_LENGTH)
-    }
-
-    /// Get total size of all clipboard content in bytes
-    #[allow(dead_code)] // Utility method that might be used by future features
-    pub async fn get_total_content_size(&self) -> usize {
-        let history = self.history.lock().await;
-        history.iter().map(|item| item.get_size_bytes()).sum()
-    }
-
-    /// Get statistics about clipboard usage
-    pub async fn get_usage_stats(&self) -> (usize, usize, usize, usize) {
-        let history = self.history.lock().await;
-        let item_count = history.len();
-        let total_size = history.iter().map(|item| item.get_size_bytes()).sum();
-        let avg_size = if item_count > 0 {
-            total_size / item_count
-        } else {
-            0
-        };
-        let largest_item = history
-            .iter()
-            .map(|item| item.get_size_bytes())
-            .max()
-            .unwrap_or(0);
-
-        (item_count, total_size, avg_size, largest_item)
     }
 
     async fn save_history(&self) -> io::Result<()> {

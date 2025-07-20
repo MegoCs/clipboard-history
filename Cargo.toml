@@ -9,9 +9,16 @@ base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 crossterm = "0.27"
 dirs = "5.0"
+eframe = "0.29"
+egui = "0.29"
 fuzzy-matcher = "0.3"
+global-hotkey = "0.6"
 image = { version = "0.25", features = ["png", "jpeg"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.0", features = ["full"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
+winit = "0.30"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "processthreadsapi", "wincon"] }

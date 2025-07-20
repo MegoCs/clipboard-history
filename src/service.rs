@@ -2,22 +2,22 @@ use crate::clipboard_item::ClipboardItem;
 use crate::clipboard_manager::ClipboardManager;
 use crate::monitor::{ClipboardEvent, ClipboardMonitor};
 use std::io;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
 /// Core service that provides all clipboard management functionality
 /// This is completely UI-agnostic and can be used by any interface (console, desktop, web, etc.)
+#[derive(Clone)]
 pub struct ClipboardService {
     manager: Arc<ClipboardManager>,
-    monitor: Option<ClipboardMonitor>,
+    monitor: Option<Arc<ClipboardMonitor>>,
 }
 
 impl ClipboardService {
     /// Create a new clipboard service instance
     pub async fn new() -> io::Result<Self> {
         let manager = Arc::new(ClipboardManager::new().await?);
-        let monitor = ClipboardMonitor::new(Arc::clone(&manager));
+        let monitor = Arc::new(ClipboardMonitor::new(Arc::clone(&manager)));
 
         Ok(Self {
             manager,
@@ -37,10 +37,11 @@ impl ClipboardService {
     /// Start background clipboard monitoring
     /// Returns a receiver for clipboard events
     pub fn start_monitoring(&mut self) -> Option<broadcast::Receiver<ClipboardEvent>> {
-        if let Some(monitor) = self.monitor.take() {
+        if let Some(monitor) = &self.monitor {
             let event_receiver = monitor.subscribe();
+            let monitor_clone = Arc::clone(monitor);
             let monitor_task = tokio::spawn(async move {
-                monitor.start_monitoring().await;
+                monitor_clone.start_monitoring().await;
             });
 
             // Store the task handle if needed for cleanup
@@ -58,11 +59,6 @@ impl ClipboardService {
         self.manager.get_history().await
     }
 
-    /// Get the count of items in history
-    pub async fn get_history_count(&self) -> usize {
-        self.manager.get_history_count().await
-    }
-
     /// Search clipboard history with exact text matching
     pub async fn search(&self, query: &str) -> Vec<(usize, ClipboardItem)> {
         self.manager.search_history(query).await
@@ -73,29 +69,9 @@ impl ClipboardService {
         self.manager.fuzzy_search_history(query).await
     }
 
-    /// Clear all clipboard history
-    pub async fn clear_history(&self) -> io::Result<()> {
-        self.manager.clear_history().await
-    }
-
     /// Copy a specific item back to the system clipboard
     pub async fn copy_to_clipboard(&self, index: usize) -> io::Result<bool> {
         self.manager.copy_item_to_clipboard(index).await
-    }
-
-    /// Get the storage file path
-    pub fn get_storage_path(&self) -> &PathBuf {
-        self.manager.get_storage_path()
-    }
-
-    /// Get content size limits
-    pub fn get_content_limits(&self) -> (usize, usize, usize) {
-        self.manager.get_content_limits()
-    }
-
-    /// Get clipboard usage statistics
-    pub async fn get_usage_stats(&self) -> (usize, usize, usize, usize) {
-        self.manager.get_usage_stats().await
     }
 }
 
@@ -104,6 +80,7 @@ impl ClipboardService {
 pub struct SearchResult {
     pub index: usize,
     pub item: ClipboardItem,
+    #[allow(dead_code)] // May be used for future search result ranking features
     pub score: Option<i64>, // None for exact text search, Some(score) for fuzzy search
 }
 
