@@ -30,7 +30,7 @@ async fn run_popup_mode() -> io::Result<()> {
         eprintln!("Failed to register hotkey: {}", e);
         return Err(io::Error::new(
             io::ErrorKind::Other,
-            format!("Hotkey registration failed: {}", e)
+            format!("Hotkey registration failed: {}", e),
         ));
     }
 

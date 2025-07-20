@@ -57,9 +57,7 @@ impl ClipboardMonitor {
                     if !content_hash.is_empty() && content_hash != last_content_hash {
                         match self.manager.add_clipboard_item(clipboard_item).await {
                             Ok(()) => {
-                                let _ = self
-                                    .event_sender
-                                    .send(ClipboardEvent::ItemAdded);
+                                let _ = self.event_sender.send(ClipboardEvent::ItemAdded);
                             }
                             Err(_) => {
                                 let _ = self.event_sender.send(ClipboardEvent::Error);
@@ -193,14 +191,15 @@ impl ClipboardMonitor {
         png_data: &[u8],
     ) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
         use image::ImageReader;
-        
+
         let reader = ImageReader::new(std::io::Cursor::new(png_data))
             .with_guessed_format()
             .map_err(|e| format!("Failed to read image format: {}", e))?;
-            
-        let img = reader.decode()
+
+        let img = reader
+            .decode()
             .map_err(|e| format!("Failed to decode image: {}", e))?;
-            
+
         let rgba_img = img.to_rgba8();
         Ok(rgba_img.into_raw())
     }
