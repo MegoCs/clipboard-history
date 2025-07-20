@@ -1,4 +1,4 @@
-use crate::clipboard_item::ClipboardItem;
+use crate::clipboard_item::{ClipboardItem, ClipboardContentType};
 use crate::storage::Storage;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
@@ -6,6 +6,7 @@ use std::collections::VecDeque;
 use std::io;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use base64::prelude::*;
 
 const MAX_HISTORY_SIZE: usize = 1000;
 const MAX_CONTENT_SIZE: usize = 10_000_000; // 10MB limit for individual entries
@@ -46,14 +47,15 @@ impl ClipboardManager {
         Self { history, storage }
     }
 
-    pub async fn add_item(&self, content: String) -> io::Result<()> {
+    pub async fn add_clipboard_item(&self, item: ClipboardItem) -> io::Result<()> {
         // Check content size limit
-        if content.len() > MAX_CONTENT_SIZE {
+        let item_size = item.get_size_bytes();
+        if item_size > MAX_CONTENT_SIZE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
                     "Content too large: {} bytes (max: {} bytes)",
-                    content.len(),
+                    item_size,
                     MAX_CONTENT_SIZE
                 ),
             ));
@@ -61,14 +63,13 @@ impl ClipboardManager {
 
         let mut history = self.history.lock().await;
 
-        // Skip duplicates
+        // Skip duplicates by comparing content hash
         if let Some(last) = history.front() {
-            if last.content == content {
+            if last.content_hash == item.content_hash {
                 return Ok(());
             }
         }
 
-        let item = ClipboardItem::new(content, history.len());
         history.push_front(item);
 
         // Maintain max size
@@ -78,6 +79,12 @@ impl ClipboardManager {
 
         drop(history);
         self.save_history().await
+    }
+
+    // Keep the old method for backward compatibility
+    pub async fn add_item(&self, content: String) -> io::Result<()> {
+        let item = ClipboardItem::new_text(content);
+        self.add_clipboard_item(item).await
     }
 
     pub async fn get_history(&self) -> Vec<ClipboardItem> {
@@ -100,15 +107,18 @@ impl ClipboardManager {
     pub async fn search_history(&self, query: &str) -> Vec<(usize, ClipboardItem)> {
         let history = self.history.lock().await;
 
-        // Simple text-based search (case-insensitive contains)
-        let text_matches: Vec<(usize, ClipboardItem)> = history
+        // Search across different content types
+        let matches: Vec<(usize, ClipboardItem)> = history
             .iter()
             .enumerate()
-            .filter(|(_, item)| item.content.to_lowercase().contains(&query.to_lowercase()))
+            .filter(|(_, item)| {
+                let preview = item.get_preview();
+                preview.to_lowercase().contains(&query.to_lowercase())
+            })
             .map(|(idx, item)| (idx, item.clone()))
             .collect();
 
-        text_matches
+        matches
     }
 
     pub async fn fuzzy_search_history(&self, query: &str) -> Vec<(usize, ClipboardItem, i64)> {
@@ -119,8 +129,9 @@ impl ClipboardManager {
             .iter()
             .enumerate()
             .filter_map(|(idx, item)| {
+                let preview = item.get_preview();
                 matcher
-                    .fuzzy_match(&item.content, query)
+                    .fuzzy_match(&preview, query)
                     .map(|score| (idx, item.clone(), score))
             })
             .collect();
@@ -133,16 +144,59 @@ impl ClipboardManager {
     pub async fn copy_item_to_clipboard(&self, index: usize) -> io::Result<bool> {
         let history = self.history.lock().await;
         if let Some(item) = history.get(index) {
-            let content = item.content.clone();
+            let item_clone = item.clone();
             drop(history);
 
             // Use blocking task for clipboard operation
             let result = tokio::task::spawn_blocking(move || {
-                let mut clipboard =
-                    arboard::Clipboard::new().map_err(|_| "Failed to access clipboard")?;
-                clipboard
-                    .set_text(content)
-                    .map_err(|_| "Failed to set clipboard text")
+                let mut clipboard = arboard::Clipboard::new().map_err(|_| "Failed to access clipboard")?;
+                
+                match &item_clone.content {
+                    ClipboardContentType::Text(text) => {
+                        clipboard.set_text(text.clone()).map_err(|_| "Failed to set clipboard text")?;
+                    }
+                    ClipboardContentType::Image { data, .. } => {
+                        // Try to decode base64 image data
+                        if let Ok(img_data) = BASE64_STANDARD.decode(data) {
+                            let img = arboard::ImageData {
+                                width: 0, // arboard will detect dimensions
+                                height: 0,
+                                bytes: std::borrow::Cow::Borrowed(&img_data),
+                            };
+                            clipboard.set_image(img).map_err(|_| "Failed to set clipboard image")?;
+                        } else {
+                            return Err("Invalid image data");
+                        }
+                    }
+                    ClipboardContentType::Html { html, plain_text } => {
+                        // Try HTML first, fallback to plain text
+                        if let Some(plain) = plain_text {
+                            if clipboard.set_html(html, Some(plain)).is_err() {
+                                clipboard.set_text(plain.clone()).map_err(|_| "Failed to set clipboard text")?;
+                            }
+                        } else {
+                            clipboard.set_text(html.clone()).map_err(|_| "Failed to set clipboard text")?;
+                        }
+                    }
+                    ClipboardContentType::Files(paths) => {
+                        // Convert string paths to PathBuf
+                        let _path_bufs: Vec<std::path::PathBuf> = paths.iter().map(|p| std::path::PathBuf::from(p)).collect();
+                        clipboard.set_text(paths.join("\n")).map_err(|_| "Failed to set file paths as text")?;
+                    }
+                    ClipboardContentType::Other { data, .. } => {
+                        // For other types, try to decode as text or set as base64
+                        if let Ok(decoded) = BASE64_STANDARD.decode(data) {
+                            if let Ok(text) = String::from_utf8(decoded) {
+                                clipboard.set_text(text).map_err(|_| "Failed to set clipboard text")?;
+                            } else {
+                                clipboard.set_text(data.clone()).map_err(|_| "Failed to set clipboard text")?;
+                            }
+                        } else {
+                            clipboard.set_text(data.clone()).map_err(|_| "Failed to set clipboard text")?;
+                        }
+                    }
+                }
+                Ok(())
             })
             .await;
 
@@ -169,14 +223,14 @@ impl ClipboardManager {
     #[allow(dead_code)] // Utility method that might be used by future features
     pub async fn get_total_content_size(&self) -> usize {
         let history = self.history.lock().await;
-        history.iter().map(|item| item.content.len()).sum()
+        history.iter().map(|item| item.get_size_bytes()).sum()
     }
 
     /// Get statistics about clipboard usage
     pub async fn get_usage_stats(&self) -> (usize, usize, usize, usize) {
         let history = self.history.lock().await;
         let item_count = history.len();
-        let total_size = history.iter().map(|item| item.content.len()).sum();
+        let total_size = history.iter().map(|item| item.get_size_bytes()).sum();
         let avg_size = if item_count > 0 {
             total_size / item_count
         } else {
@@ -184,7 +238,7 @@ impl ClipboardManager {
         };
         let largest_item = history
             .iter()
-            .map(|item| item.content.len())
+            .map(|item| item.get_size_bytes())
             .max()
             .unwrap_or(0);
 

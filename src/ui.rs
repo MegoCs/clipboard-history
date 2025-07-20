@@ -243,7 +243,7 @@ impl ConsoleInterface {
         let display_count = results.len().min(15);
 
         for (display_num, result) in results.iter().take(display_count).enumerate() {
-            let preview = result.item.smart_preview(100);
+            let preview = result.item.get_preview();
             let timestamp = result.item.formatted_timestamp();
             let score = result.score.unwrap_or(0);
             println!(
@@ -270,7 +270,7 @@ impl ConsoleInterface {
         let display_count = results.len().min(15);
 
         for (display_num, result) in results.iter().take(display_count).enumerate() {
-            let preview = result.item.smart_preview(100);
+            let preview = result.item.get_preview();
             let timestamp = result.item.formatted_timestamp();
             println!("{}. {} [{}]", display_num + 1, preview, timestamp);
         }
@@ -317,7 +317,7 @@ impl ConsoleInterface {
                         let result = &results[num - 1];
 
                         println!("\nSelected item {num}:");
-                        println!("Content: {}", result.item.content);
+                        println!("Content: {}", result.item.display_content());
                         println!("Timestamp: {}", result.item.formatted_timestamp());
 
                         // Copy to clipboard using the search result's index, not the item ID
@@ -377,7 +377,7 @@ impl ConsoleInterface {
                         let result = &results[num - 1];
 
                         println!("\nSelected item {num}:");
-                        println!("Content: {}", result.item.content);
+                        println!("Content: {}", result.item.display_content());
                         println!("Timestamp: {}", result.item.formatted_timestamp());
 
                         // Copy to clipboard using the search result's index, not the item ID
@@ -434,7 +434,7 @@ impl ConsoleInterface {
         let history = self.service.get_history().await;
         if let Some(item) = history.get(number - 1) {
             println!("\nSelected item {number}:");
-            println!("Content: {}", item.content);
+            println!("Content: {}", item.display_content());
             println!("Timestamp: {}", item.formatted_timestamp());
 
             // Copy to clipboard using the array index (number - 1)

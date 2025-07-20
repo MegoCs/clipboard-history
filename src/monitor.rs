@@ -1,8 +1,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast;
+use base64::prelude::*;
 
 use crate::clipboard_manager::ClipboardManager;
+use crate::clipboard_item::{ClipboardContentType, ClipboardItem, ImageFormat};
 
 #[derive(Debug, Clone)]
 pub enum ClipboardEvent {
@@ -39,78 +41,140 @@ impl ClipboardMonitor {
     }
 
     pub async fn start_monitoring(&self) {
-        let mut last_content = String::new();
+        let mut last_content_hash = String::new();
 
         // Notify that monitoring has started
         let _ = self.event_sender.send(ClipboardEvent::Started);
 
         loop {
-            let content = self.get_clipboard_content().await;
+            let content_result = self.get_clipboard_content().await;
 
-            if let Ok(content) = content {
-                if !content.is_empty() && content != last_content {
-                    // Create a more descriptive preview for large content
-                    let preview = if content.len() > 200 {
-                        let truncated = content[..200.min(content.len())].to_string();
-                        format!("{} [{}...]", truncated, format_bytes(content.len()))
-                    } else {
-                        content[..50.min(content.len())].to_string()
-                    };
+            match content_result {
+                Ok(clipboard_item) => {
+                    // Create a hash of the content to detect changes
+                    let content_hash = self.create_content_hash(&clipboard_item);
+                    
+                    if !content_hash.is_empty() && content_hash != last_content_hash {
+                        // Create a preview for the event
+                        let preview = clipboard_item.smart_preview(100);
 
-                    match self.manager.add_item(content.clone()).await {
-                        Ok(()) => {
-                            let _ = self
-                                .event_sender
-                                .send(ClipboardEvent::ItemAdded { preview });
+                        match self.manager.add_clipboard_item(clipboard_item).await {
+                            Ok(()) => {
+                                let _ = self
+                                    .event_sender
+                                    .send(ClipboardEvent::ItemAdded { preview });
+                            }
+                            Err(e) => {
+                                let _ = self.event_sender.send(ClipboardEvent::Error {
+                                    message: format!("Error adding clipboard item: {e}"),
+                                });
+                            }
                         }
-                        Err(e) => {
-                            let _ = self.event_sender.send(ClipboardEvent::Error {
-                                message: format!("Error adding clipboard item: {e}"),
-                            });
-                        }
+                        last_content_hash = content_hash;
                     }
-                    last_content = content;
                 }
-            } else if let Err(e) = content {
-                let _ = self.event_sender.send(ClipboardEvent::Error { message: e });
+                Err(e) => {
+                    let _ = self.event_sender.send(ClipboardEvent::Error { message: e });
+                }
             }
 
             tokio::time::sleep(self.poll_interval).await;
         }
     }
 
-    async fn get_clipboard_content(&self) -> Result<String, String> {
+    /// Create a hash representation of clipboard content for change detection
+    fn create_content_hash(&self, item: &ClipboardItem) -> String {
+        match &item.content {
+            ClipboardContentType::Text(text) => text.clone(),
+            ClipboardContentType::Image { data, format, width, height } => {
+                format!("img:{}:{:?}:{}x{}", data.len(), format, width, height)
+            }
+            ClipboardContentType::Html { html, .. } => format!("html:{}", html.len()),
+            ClipboardContentType::Files(files) => format!("files:{}", files.join("|")),
+            ClipboardContentType::Other { content_type, data } => {
+                format!("other:{}:{}", content_type, data.len())
+            }
+        }
+    }
+
+    async fn get_clipboard_content(&self) -> Result<ClipboardItem, String> {
         let result = tokio::task::spawn_blocking(|| {
             let mut clipboard =
                 arboard::Clipboard::new().map_err(|_| "Failed to access clipboard")?;
-            clipboard
-                .get_text()
-                .map_err(|_| "Failed to get clipboard text")
+            
+            // Try to get image first (images have higher priority)
+            if let Ok(image_data) = clipboard.get_image() {
+                let width = image_data.width as u32;
+                let height = image_data.height as u32;
+                
+                // Convert RGBA to PNG bytes for storage
+                let png_data = Self::rgba_to_png(&image_data.bytes, width, height)
+                    .map_err(|_| "Failed to encode image data")?;
+                
+                return Ok(ClipboardContentType::Image {
+                    data: BASE64_STANDARD.encode(&png_data),
+                    format: ImageFormat::Png,
+                    width,
+                    height,
+                });
+            }
+            
+            // Try to get HTML if available (not supported by arboard 3.6)
+            // if let Ok(html) = clipboard.get_html() {
+            //     let plain_text = clipboard.get_text().ok();
+            //     return Ok(ClipboardContentType::Html { html, plain_text });
+            // }
+            
+            // Try to get text
+            if let Ok(text) = clipboard.get_text() {
+                if !text.trim().is_empty() {
+                    return Ok(ClipboardContentType::Text(text));
+                }
+            }
+            
+            Err("No supported clipboard content found")
         })
         .await;
 
         match result {
-            Ok(Ok(content)) => Ok(content),
+            Ok(Ok(content)) => {
+                // Create a new ClipboardItem with the appropriate constructor
+                let item = match content {
+                    ClipboardContentType::Text(text) => ClipboardItem::new_text(text),
+                    ClipboardContentType::Image { data, format, width, height } => {
+                        // Convert base64 string back to bytes
+                        if let Ok(decoded_data) = BASE64_STANDARD.decode(&data) {
+                            ClipboardItem::new_image(decoded_data, format, width, height)
+                        } else {
+                            return Err("Failed to decode image data".to_string());
+                        }
+                    }
+                    ClipboardContentType::Html { html, plain_text } => {
+                        ClipboardItem::new_html(html, plain_text)
+                    }
+                    ClipboardContentType::Files(files) => ClipboardItem::new_files(files),
+                    ClipboardContentType::Other { content_type, data } => {
+                        ClipboardItem::new_other(content_type, data)
+                    }
+                };
+                Ok(item)
+            }
             Ok(Err(e)) => Err(e.to_string()),
             Err(e) => Err(format!("Clipboard access error: {e}")),
         }
     }
-}
 
-/// Format bytes in a human-readable format
-fn format_bytes(bytes: usize) -> String {
-    const UNITS: &[&str] = &["B", "KB", "MB", "GB"];
-    let mut size = bytes as f64;
-    let mut unit_index = 0;
-
-    while size >= 1024.0 && unit_index < UNITS.len() - 1 {
-        size /= 1024.0;
-        unit_index += 1;
-    }
-
-    if unit_index == 0 {
-        format!("{} {}", size as usize, UNITS[unit_index])
-    } else {
-        format!("{:.1} {}", size, UNITS[unit_index])
+    /// Convert RGBA bytes to PNG format
+    fn rgba_to_png(rgba_data: &[u8], width: u32, height: u32) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+        use image::{ImageBuffer, Rgba};
+        
+        let img_buffer = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, rgba_data)
+            .ok_or("Failed to create image buffer")?;
+        
+        let mut png_data = Vec::new();
+        img_buffer.write_to(&mut std::io::Cursor::new(&mut png_data), image::ImageFormat::Png)?;
+        Ok(png_data)
     }
 }
+
+
