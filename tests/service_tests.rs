@@ -28,7 +28,6 @@ async fn test_service_operations() {
     // Test getting history
     let history = service.get_history().await;
     assert_eq!(history.len(), 2);
-    assert_eq!(service.get_history_count().await, 2);
 
     // Test search
     let results = service.search("Test").await;
@@ -41,17 +40,4 @@ async fn test_service_operations() {
     // Test unified search
     let (exact, fuzzy) = service.search_unified("Test").await;
     assert!(!exact.is_empty() || !fuzzy.is_empty());
-
-    // Test usage stats
-    let (item_count, total_size, avg_size, largest_item) = service.get_usage_stats().await;
-    assert_eq!(item_count, 2);
-    assert!(total_size > 0);
-    assert!(avg_size > 0);
-    assert!(largest_item > 0);
-
-    // Test content limits
-    let (max_content, max_history, max_preview) = service.get_content_limits();
-    assert!(max_content > 0);
-    assert!(max_history > 0);
-    assert!(max_preview > 0);
 }

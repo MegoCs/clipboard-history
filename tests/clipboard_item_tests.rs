@@ -19,10 +19,9 @@ fn test_clipboard_item_preview() {
     let long_content = "This is a very long clipboard content that should be truncated when displayed as a preview to the user".to_string();
     let item = ClipboardItem::new_text(long_content);
 
-    let preview = item.get_preview();
-    // The preview contains the text with type prefix and size info
+    let preview = item.clean_preview(50);
+    // The preview contains the text content, truncated to 50 characters
     assert!(preview.contains("This is a very long"));
-    assert!(preview.contains("[Text]"));
 }
 
 #[test]
@@ -30,18 +29,19 @@ fn test_clipboard_item_preview_short_content() {
     let short_content = "Short".to_string();
     let item = ClipboardItem::new_text(short_content.clone());
 
-    let preview = item.get_preview();
+    let preview = item.clean_preview(100);
     assert!(preview.contains("Short"));
 }
 
 #[test]
-fn test_smart_preview() {
+fn test_clean_preview() {
     let long_content = "This is a very long clipboard content that should be truncated when displayed as a preview to the user".to_string();
     let item = ClipboardItem::new_text(long_content);
 
-    let smart_preview = item.smart_preview(50);
-    assert!(smart_preview.contains("This is a very long"));
-    assert!(smart_preview.contains("Text"));
+    let clean_preview = item.clean_preview(50);
+    assert!(clean_preview.contains("This is a very long"));
+    // Note: clean_preview may be slightly longer than max_chars due to "..." suffix
+    assert!(clean_preview.len() <= 53); // 50 + "..." = 53
 }
 
 #[test]
@@ -53,23 +53,23 @@ fn test_content_analysis() {
         "x".repeat(200)
     );
     let json_item = ClipboardItem::new_text(json_content);
-    let preview = json_item.smart_preview(100);
-    // JSON detection might work depending on the smart_preview implementation
-    assert!(preview.contains("Text"));
+    let preview = json_item.clean_preview(100);
+    // JSON content preview
+    assert!(preview.contains("key"));
 
     // Test URL detection with content that will be truncated
     let url_content = format!("https://example.com {}", "x".repeat(200));
     let url_item = ClipboardItem::new_text(url_content);
-    let preview = url_item.smart_preview(100);
-    assert!(preview.contains("Text"));
+    let preview = url_item.clean_preview(100);
+    assert!(preview.contains("https://example.com"));
 
     // Test multi-line detection
     let multiline_content =
         "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\nLine 11"
             .to_string();
     let multiline_item = ClipboardItem::new_text(multiline_content);
-    let preview = multiline_item.smart_preview(100);
-    assert!(preview.contains("Text"));
+    let preview = multiline_item.clean_preview(100);
+    assert!(preview.contains("Line 1"));
 }
 
 #[test]
@@ -90,11 +90,9 @@ fn test_format_content_size() {
 }
 
 #[test]
-fn test_formatted_timestamp() {
+fn test_timestamp() {
     let item = ClipboardItem::new_text("test".to_string());
-    let formatted = item.formatted_timestamp();
 
-    // Should be in format YYYY-MM-DD HH:MM:SS or fallback format
-    assert!(!formatted.is_empty());
-    assert!(formatted.contains("-") || formatted.contains("ts:"));
+    // Test that timestamp is set (non-zero)
+    assert!(item.timestamp.timestamp() > 0);
 }
