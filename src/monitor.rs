@@ -1,4 +1,3 @@
-use clipboard::ClipboardProvider;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast;
@@ -81,14 +80,15 @@ impl ClipboardMonitor {
     }
 
     async fn get_clipboard_content(&self) -> Result<String, String> {
-        let result = tokio::task::spawn_blocking(|| match clipboard::ClipboardContext::new() {
-            Ok(mut ctx) => ctx.get_contents().unwrap_or_default(),
-            Err(_) => String::new(),
+        let result = tokio::task::spawn_blocking(|| {
+            let mut clipboard = arboard::Clipboard::new().map_err(|_| "Failed to access clipboard")?;
+            clipboard.get_text().map_err(|_| "Failed to get clipboard text")
         })
         .await;
 
         match result {
-            Ok(content) => Ok(content),
+            Ok(Ok(content)) => Ok(content),
+            Ok(Err(e)) => Err(e.to_string()),
             Err(e) => Err(format!("Clipboard access error: {e}")),
         }
     }
