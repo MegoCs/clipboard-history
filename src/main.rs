@@ -27,11 +27,8 @@ async fn run_popup_mode() -> io::Result<()> {
     // Set up hotkey manager
     let hotkey_manager = HotkeyManager::new();
     if let Err(e) = hotkey_manager.register_hotkey("Ctrl+Shift+V") {
-        eprintln!("Failed to register hotkey: {}", e);
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("Hotkey registration failed: {e}"),
-        ));
+        eprintln!("Failed to register hotkey: {e}");
+        return Err(io::Error::other(format!("Hotkey registration failed: {e}")));
     }
 
     println!("Hotkey registered successfully. Waiting for Ctrl+Shift+V...");
@@ -57,7 +54,7 @@ async fn run_popup_mode() -> io::Result<()> {
                     println!("✅ Popup window closed successfully");
                 }
                 Ok(Err(e)) => {
-                    eprintln!("❌ Error showing popup: {}", e);
+                    eprintln!("❌ Error showing popup: {e}");
                 }
                 Err(_) => {
                     println!("⚠️ Popup exited unexpectedly, but continuing...");
