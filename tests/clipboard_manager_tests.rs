@@ -120,7 +120,6 @@ async fn test_history_access() {
     let history = manager.get_history().await;
     assert_eq!(history.len(), 2);
 
-        
     // Most recent first - check using display_content
     let first_searchable = history[0].display_content();
     let second_searchable = history[1].display_content();
