@@ -151,10 +151,10 @@ impl ClipboardManager {
                                         };
                                         clipboard
                                             .set_image(img)
-                                            .map_err(|e| format!("Failed to set clipboard image: {}", e))?;
+                                            .map_err(|e| format!("Failed to set clipboard image: {e}"))?;
                                     }
                                     Err(e) => {
-                                        return Err(format!("Failed to decode image data: {}", e));
+                                        return Err(format!("Failed to decode image data: {e}"));
                                     }
                                 }
                             } else {

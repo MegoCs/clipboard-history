@@ -121,7 +121,7 @@ impl ClipboardItem {
             content_str
         } else {
             let truncated = content_str.chars().take(max_chars).collect::<String>();
-            format!("{}...", truncated)
+            format!("{truncated}...")
         }
     }
 
@@ -142,9 +142,11 @@ impl ClipboardItem {
             }
             ClipboardContentType::Files(files) => {
                 if files.len() == 1 {
-                    format!("File: {}", files[0])
+                    format!("File: {}", &files[0])
                 } else {
-                    format!("{} files: {}", files.len(), files.join(", "))
+                    let file_count = files.len();
+                    let file_list = files.join(", ");
+                    format!("{file_count} files: {file_list}")
                 }
             }
             ClipboardContentType::Other { content_type, .. } => {

@@ -85,12 +85,20 @@ impl ClipboardMonitor {
                 width,
                 height,
             } => {
-                format!("img:{}:{:?}:{}x{}", data.len(), format, width, height)
+                let data_len = data.len();
+                format!("img:{data_len}:{format:?}:{width}x{height}")
             }
-            ClipboardContentType::Html { html, .. } => format!("html:{}", html.len()),
-            ClipboardContentType::Files(files) => format!("files:{}", files.join("|")),
+            ClipboardContentType::Html { html, .. } => {
+                let html_len = html.len();
+                format!("html:{html_len}")
+            }
+            ClipboardContentType::Files(files) => {
+                let file_list = files.join("|");
+                format!("files:{file_list}")
+            }
             ClipboardContentType::Other { content_type, data } => {
-                format!("other:{}:{}", content_type, data.len())
+                let data_len = data.len();
+                format!("other:{content_type}:{data_len}")
             }
         }
     }
@@ -194,11 +202,11 @@ impl ClipboardMonitor {
 
         let reader = ImageReader::new(std::io::Cursor::new(png_data))
             .with_guessed_format()
-            .map_err(|e| format!("Failed to read image format: {}", e))?;
+            .map_err(|e| format!("Failed to read image format: {e}"))?;
 
         let img = reader
             .decode()
-            .map_err(|e| format!("Failed to decode image: {}", e))?;
+            .map_err(|e| format!("Failed to decode image: {e}"))?;
 
         let rgba_img = img.to_rgba8();
         Ok(rgba_img.into_raw())

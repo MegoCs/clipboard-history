@@ -464,7 +464,7 @@ impl eframe::App for PopupApp {
                                                         // Try to decode and display the image
                                                         if let Ok(image_data) = base64::prelude::BASE64_STANDARD.decode(data) {
                                                             // Check if we have a cached texture first
-                                                            let texture_id = format!("thumb_{}", result.item.id);
+                                                            let texture_id = format!("thumb_{}", &result.item.id);
 
                                                             if let Some(cached_texture) = self.texture_cache.get(&texture_id) {
                                                                 // Use cached texture
@@ -504,18 +504,16 @@ impl eframe::App for PopupApp {
                                                         }
 
                                                         // Add image info text
-                                                        ui.label(format!("{}. image",
-                                                            display_index + 1
-                                                        ));
+                                                        let item_number = display_index + 1;
+                                                        ui.label(format!("{item_number}. image"));
                                                     }).response
                                                 },
                                                 _ => {
                                                     // Regular text-based items
                                                     ui.horizontal(|ui| {
-                                                        ui.label(format!("{}. {}",
-                                                            display_index + 1,
-                                                            result.item.clean_preview(50)
-                                                        ))
+                                                        let item_number = display_index + 1;
+                                                        let preview_text = result.item.clean_preview(50);
+                                                        ui.label(format!("{item_number}. {preview_text}"))
                                                     }).response
                                                 }
                                             }
