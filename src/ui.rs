@@ -43,17 +43,17 @@ impl ConsoleInterface {
         let storage_path = self.service.get_storage_path();
 
         println!("Clipboard Manager Started!");
-        println!("Items loaded: {}", count);
-        println!("Storage location: {:?}", storage_path);
+        println!("Items loaded: {count}");
+        println!("Storage location: {storage_path:?}");
     }
 
     fn handle_clipboard_event(event: ClipboardEvent) {
         match event {
             ClipboardEvent::ItemAdded { preview } => {
-                println!("New clipboard: {:?}", preview);
+                println!("New clipboard: {preview:?}");
             }
             ClipboardEvent::Error { message } => {
-                eprintln!("Clipboard error: {}", message);
+                eprintln!("Clipboard error: {message}");
             }
             ClipboardEvent::Started => {
                 println!("Clipboard monitoring started");
@@ -94,7 +94,7 @@ impl ConsoleInterface {
                     if let Ok(num) = command.parse::<usize>() {
                         self.select_item(num).await;
                     } else {
-                        println!("Unknown command: '{}'. Type 'h' for help.", command);
+                        println!("Unknown command: '{command}'. Type 'h' for help.");
                     }
                 }
             }
@@ -156,7 +156,7 @@ impl ConsoleInterface {
         let (max_content, max_history, _) = self.service.get_content_limits();
 
         println!("\n=== Clipboard Usage Statistics ===");
-        println!("Items in history: {} / {} max", item_count, max_history);
+        println!("Items in history: {item_count} / {max_history} max");
         println!("Total content size: {}", format_size(total_size));
         println!("Average item size: {}", format_size(avg_size));
         println!("Largest item size: {}", format_size(largest_item));
@@ -204,7 +204,7 @@ impl ConsoleInterface {
         let (exact_results, fuzzy_results) = self.service.search_unified(query).await;
 
         if exact_results.is_empty() && fuzzy_results.is_empty() {
-            println!("No items found matching '{}'", query);
+            println!("No items found matching '{query}'");
             return Ok(());
         }
 
@@ -316,7 +316,7 @@ impl ConsoleInterface {
                     if num > 0 && num <= results.len().min(15) {
                         let result = &results[num - 1];
 
-                        println!("\nSelected item {}:", num);
+                        println!("\nSelected item {num}:");
                         println!("Content: {}", result.item.content);
                         println!("Timestamp: {}", result.item.formatted_timestamp());
 
@@ -329,7 +329,7 @@ impl ConsoleInterface {
                                 println!("❌ Failed to copy to clipboard.");
                             }
                             Err(e) => {
-                                println!("❌ Error copying to clipboard: {:?}", e);
+                                println!("❌ Error copying to clipboard: {e:?}");
                             }
                         }
                     } else {
@@ -376,7 +376,7 @@ impl ConsoleInterface {
                     if num > 0 && num <= results.len().min(15) {
                         let result = &results[num - 1];
 
-                        println!("\nSelected item {}:", num);
+                        println!("\nSelected item {num}:");
                         println!("Content: {}", result.item.content);
                         println!("Timestamp: {}", result.item.formatted_timestamp());
 
@@ -389,7 +389,7 @@ impl ConsoleInterface {
                                 println!("❌ Failed to copy to clipboard.");
                             }
                             Err(e) => {
-                                println!("❌ Error copying to clipboard: {:?}", e);
+                                println!("❌ Error copying to clipboard: {e:?}");
                             }
                         }
                     } else {
@@ -414,7 +414,7 @@ impl ConsoleInterface {
 
         if input.trim().to_lowercase() == "y" {
             if let Err(e) = self.service.clear_history().await {
-                println!("❌ Error clearing history: {:?}", e);
+                println!("❌ Error clearing history: {e:?}");
             } else {
                 println!("Clipboard history cleared.");
             }
@@ -433,7 +433,7 @@ impl ConsoleInterface {
 
         let history = self.service.get_history().await;
         if let Some(item) = history.get(number - 1) {
-            println!("\nSelected item {}:", number);
+            println!("\nSelected item {number}:");
             println!("Content: {}", item.content);
             println!("Timestamp: {}", item.formatted_timestamp());
 
@@ -446,11 +446,11 @@ impl ConsoleInterface {
                     println!("❌ Failed to copy to clipboard.");
                 }
                 Err(e) => {
-                    println!("❌ Error copying to clipboard: {:?}", e);
+                    println!("❌ Error copying to clipboard: {e:?}");
                 }
             }
         } else {
-            println!("Item {} not found.", number);
+            println!("Item {number} not found.");
         }
     }
 }

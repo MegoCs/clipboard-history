@@ -66,7 +66,7 @@ impl ClipboardMonitor {
                         }
                         Err(e) => {
                             let _ = self.event_sender.send(ClipboardEvent::Error {
-                                message: format!("Error adding clipboard item: {}", e),
+                                message: format!("Error adding clipboard item: {e}"),
                             });
                         }
                     }
@@ -89,7 +89,7 @@ impl ClipboardMonitor {
 
         match result {
             Ok(content) => Ok(content),
-            Err(e) => Err(format!("Clipboard access error: {}", e)),
+            Err(e) => Err(format!("Clipboard access error: {e}")),
         }
     }
 }
