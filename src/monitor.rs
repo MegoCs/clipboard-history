@@ -1,10 +1,10 @@
+use base64::prelude::*;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast;
-use base64::prelude::*;
 
-use crate::clipboard_manager::ClipboardManager;
 use crate::clipboard_item::{ClipboardContentType, ClipboardItem, ImageFormat};
+use crate::clipboard_manager::ClipboardManager;
 
 #[derive(Debug, Clone)]
 pub enum ClipboardEvent {
@@ -53,7 +53,7 @@ impl ClipboardMonitor {
                 Ok(clipboard_item) => {
                     // Create a hash of the content to detect changes
                     let content_hash = self.create_content_hash(&clipboard_item);
-                    
+
                     if !content_hash.is_empty() && content_hash != last_content_hash {
                         // Create a preview for the event
                         let preview = clipboard_item.smart_preview(100);
@@ -86,7 +86,12 @@ impl ClipboardMonitor {
     fn create_content_hash(&self, item: &ClipboardItem) -> String {
         match &item.content {
             ClipboardContentType::Text(text) => text.clone(),
-            ClipboardContentType::Image { data, format, width, height } => {
+            ClipboardContentType::Image {
+                data,
+                format,
+                width,
+                height,
+            } => {
                 format!("img:{}:{:?}:{}x{}", data.len(), format, width, height)
             }
             ClipboardContentType::Html { html, .. } => format!("html:{}", html.len()),
@@ -101,16 +106,16 @@ impl ClipboardMonitor {
         let result = tokio::task::spawn_blocking(|| {
             let mut clipboard =
                 arboard::Clipboard::new().map_err(|_| "Failed to access clipboard")?;
-            
+
             // Try to get image first (images have higher priority)
             if let Ok(image_data) = clipboard.get_image() {
                 let width = image_data.width as u32;
                 let height = image_data.height as u32;
-                
+
                 // Convert RGBA to PNG bytes for storage
                 let png_data = Self::rgba_to_png(&image_data.bytes, width, height)
                     .map_err(|_| "Failed to encode image data")?;
-                
+
                 return Ok(ClipboardContentType::Image {
                     data: BASE64_STANDARD.encode(&png_data),
                     format: ImageFormat::Png,
@@ -118,20 +123,20 @@ impl ClipboardMonitor {
                     height,
                 });
             }
-            
+
             // Try to get HTML if available (not supported by arboard 3.6)
             // if let Ok(html) = clipboard.get_html() {
             //     let plain_text = clipboard.get_text().ok();
             //     return Ok(ClipboardContentType::Html { html, plain_text });
             // }
-            
+
             // Try to get text
             if let Ok(text) = clipboard.get_text() {
                 if !text.trim().is_empty() {
                     return Ok(ClipboardContentType::Text(text));
                 }
             }
-            
+
             Err("No supported clipboard content found")
         })
         .await;
@@ -141,7 +146,12 @@ impl ClipboardMonitor {
                 // Create a new ClipboardItem with the appropriate constructor
                 let item = match content {
                     ClipboardContentType::Text(text) => ClipboardItem::new_text(text),
-                    ClipboardContentType::Image { data, format, width, height } => {
+                    ClipboardContentType::Image {
+                        data,
+                        format,
+                        width,
+                        height,
+                    } => {
                         // Convert base64 string back to bytes
                         if let Ok(decoded_data) = BASE64_STANDARD.decode(&data) {
                             ClipboardItem::new_image(decoded_data, format, width, height)
@@ -165,16 +175,21 @@ impl ClipboardMonitor {
     }
 
     /// Convert RGBA bytes to PNG format
-    fn rgba_to_png(rgba_data: &[u8], width: u32, height: u32) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+    fn rgba_to_png(
+        rgba_data: &[u8],
+        width: u32,
+        height: u32,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
         use image::{ImageBuffer, Rgba};
-        
+
         let img_buffer = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, rgba_data)
             .ok_or("Failed to create image buffer")?;
-        
+
         let mut png_data = Vec::new();
-        img_buffer.write_to(&mut std::io::Cursor::new(&mut png_data), image::ImageFormat::Png)?;
+        img_buffer.write_to(
+            &mut std::io::Cursor::new(&mut png_data),
+            image::ImageFormat::Png,
+        )?;
         Ok(png_data)
     }
 }
-
-

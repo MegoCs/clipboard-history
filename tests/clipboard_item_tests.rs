@@ -1,4 +1,4 @@
-use clipboard_history::clipboard_item::{ClipboardItem, ClipboardContentType};
+use clipboard_history::clipboard_item::{ClipboardContentType, ClipboardItem};
 
 #[test]
 fn test_clipboard_item_creation() {

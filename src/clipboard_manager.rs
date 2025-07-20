@@ -1,12 +1,12 @@
-use crate::clipboard_item::{ClipboardItem, ClipboardContentType};
+use crate::clipboard_item::{ClipboardContentType, ClipboardItem};
 use crate::storage::Storage;
+use base64::prelude::*;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use std::collections::VecDeque;
 use std::io;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use base64::prelude::*;
 
 const MAX_HISTORY_SIZE: usize = 1000;
 const MAX_CONTENT_SIZE: usize = 10_000_000; // 10MB limit for individual entries
@@ -55,8 +55,7 @@ impl ClipboardManager {
                 io::ErrorKind::InvalidData,
                 format!(
                     "Content too large: {} bytes (max: {} bytes)",
-                    item_size,
-                    MAX_CONTENT_SIZE
+                    item_size, MAX_CONTENT_SIZE
                 ),
             ));
         }
@@ -149,11 +148,14 @@ impl ClipboardManager {
 
             // Use blocking task for clipboard operation
             let result = tokio::task::spawn_blocking(move || {
-                let mut clipboard = arboard::Clipboard::new().map_err(|_| "Failed to access clipboard")?;
-                
+                let mut clipboard =
+                    arboard::Clipboard::new().map_err(|_| "Failed to access clipboard")?;
+
                 match &item_clone.content {
                     ClipboardContentType::Text(text) => {
-                        clipboard.set_text(text.clone()).map_err(|_| "Failed to set clipboard text")?;
+                        clipboard
+                            .set_text(text.clone())
+                            .map_err(|_| "Failed to set clipboard text")?;
                     }
                     ClipboardContentType::Image { data, .. } => {
                         // Try to decode base64 image data
@@ -163,7 +165,9 @@ impl ClipboardManager {
                                 height: 0,
                                 bytes: std::borrow::Cow::Borrowed(&img_data),
                             };
-                            clipboard.set_image(img).map_err(|_| "Failed to set clipboard image")?;
+                            clipboard
+                                .set_image(img)
+                                .map_err(|_| "Failed to set clipboard image")?;
                         } else {
                             return Err("Invalid image data");
                         }
@@ -172,27 +176,40 @@ impl ClipboardManager {
                         // Try HTML first, fallback to plain text
                         if let Some(plain) = plain_text {
                             if clipboard.set_html(html, Some(plain)).is_err() {
-                                clipboard.set_text(plain.clone()).map_err(|_| "Failed to set clipboard text")?;
+                                clipboard
+                                    .set_text(plain.clone())
+                                    .map_err(|_| "Failed to set clipboard text")?;
                             }
                         } else {
-                            clipboard.set_text(html.clone()).map_err(|_| "Failed to set clipboard text")?;
+                            clipboard
+                                .set_text(html.clone())
+                                .map_err(|_| "Failed to set clipboard text")?;
                         }
                     }
                     ClipboardContentType::Files(paths) => {
                         // Convert string paths to PathBuf
-                        let _path_bufs: Vec<std::path::PathBuf> = paths.iter().map(|p| std::path::PathBuf::from(p)).collect();
-                        clipboard.set_text(paths.join("\n")).map_err(|_| "Failed to set file paths as text")?;
+                        let _path_bufs: Vec<std::path::PathBuf> =
+                            paths.iter().map(|p| std::path::PathBuf::from(p)).collect();
+                        clipboard
+                            .set_text(paths.join("\n"))
+                            .map_err(|_| "Failed to set file paths as text")?;
                     }
                     ClipboardContentType::Other { data, .. } => {
                         // For other types, try to decode as text or set as base64
                         if let Ok(decoded) = BASE64_STANDARD.decode(data) {
                             if let Ok(text) = String::from_utf8(decoded) {
-                                clipboard.set_text(text).map_err(|_| "Failed to set clipboard text")?;
+                                clipboard
+                                    .set_text(text)
+                                    .map_err(|_| "Failed to set clipboard text")?;
                             } else {
-                                clipboard.set_text(data.clone()).map_err(|_| "Failed to set clipboard text")?;
+                                clipboard
+                                    .set_text(data.clone())
+                                    .map_err(|_| "Failed to set clipboard text")?;
                             }
                         } else {
-                            clipboard.set_text(data.clone()).map_err(|_| "Failed to set clipboard text")?;
+                            clipboard
+                                .set_text(data.clone())
+                                .map_err(|_| "Failed to set clipboard text")?;
                         }
                     }
                 }

@@ -1,5 +1,5 @@
+use clipboard_history::clipboard_item::{ClipboardContentType, ClipboardItem};
 use clipboard_history::clipboard_manager::ClipboardManager;
-use clipboard_history::clipboard_item::{ClipboardItem, ClipboardContentType};
 
 #[tokio::test]
 async fn test_clipboard_manager_creation() {
@@ -43,9 +43,18 @@ async fn test_duplicate_prevention() {
 async fn test_search_functionality() {
     let manager = ClipboardManager::new_empty();
 
-    manager.add_clipboard_item(ClipboardItem::new_text("Hello World".to_string())).await.unwrap();
-    manager.add_clipboard_item(ClipboardItem::new_text("Rust programming".to_string())).await.unwrap();
-    manager.add_clipboard_item(ClipboardItem::new_text("Clipboard manager".to_string())).await.unwrap();
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("Hello World".to_string()))
+        .await
+        .unwrap();
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("Rust programming".to_string()))
+        .await
+        .unwrap();
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("Clipboard manager".to_string()))
+        .await
+        .unwrap();
 
     let results = manager.search_history("rust").await;
     assert_eq!(results.len(), 1);
@@ -58,26 +67,36 @@ async fn test_search_functionality() {
 async fn test_fuzzy_search() {
     let manager = ClipboardManager::new_empty();
 
-    manager.add_clipboard_item(ClipboardItem::new_text("Hello World".to_string())).await.unwrap();
-    manager.add_clipboard_item(ClipboardItem::new_text("Help wanted".to_string())).await.unwrap();
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("Hello World".to_string()))
+        .await
+        .unwrap();
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("Help wanted".to_string()))
+        .await
+        .unwrap();
 
     let results = manager.fuzzy_search_history("helo").await; // typo
     assert!(!results.is_empty());
     // Should find "Hello World" despite the typo
-    assert!(results
-        .iter()
-        .any(|(_, item, _)| {
-            let searchable = item.searchable_content();
-            searchable.contains("Hello")
-        }));
+    assert!(results.iter().any(|(_, item, _)| {
+        let searchable = item.searchable_content();
+        searchable.contains("Hello")
+    }));
 }
 
 #[tokio::test]
 async fn test_clear_history() {
     let manager = ClipboardManager::new_empty();
 
-    manager.add_clipboard_item(ClipboardItem::new_text("Item 1".to_string())).await.unwrap();
-    manager.add_clipboard_item(ClipboardItem::new_text("Item 2".to_string())).await.unwrap();
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("Item 1".to_string()))
+        .await
+        .unwrap();
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("Item 2".to_string()))
+        .await
+        .unwrap();
 
     assert_eq!(manager.get_history_count().await, 2);
 
@@ -89,12 +108,18 @@ async fn test_clear_history() {
 async fn test_history_access() {
     let manager = ClipboardManager::new_empty();
 
-    manager.add_clipboard_item(ClipboardItem::new_text("First item".to_string())).await.unwrap();
-    manager.add_clipboard_item(ClipboardItem::new_text("Second item".to_string())).await.unwrap();
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("First item".to_string()))
+        .await
+        .unwrap();
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("Second item".to_string()))
+        .await
+        .unwrap();
 
     let history = manager.get_history().await;
     assert_eq!(history.len(), 2);
-    
+
     // Most recent first - check using searchable_content
     let first_searchable = history[0].searchable_content();
     let second_searchable = history[1].searchable_content();
@@ -126,9 +151,18 @@ async fn test_content_size_limit() {
 async fn test_usage_stats() {
     let manager = ClipboardManager::new_empty();
 
-    manager.add_clipboard_item(ClipboardItem::new_text("Small".to_string())).await.unwrap();
-    manager.add_clipboard_item(ClipboardItem::new_text("Medium content here".to_string())).await.unwrap();
-    manager.add_clipboard_item(ClipboardItem::new_text("x".repeat(1000))).await.unwrap(); // Large content
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("Small".to_string()))
+        .await
+        .unwrap();
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("Medium content here".to_string()))
+        .await
+        .unwrap();
+    manager
+        .add_clipboard_item(ClipboardItem::new_text("x".repeat(1000)))
+        .await
+        .unwrap(); // Large content
 
     let (item_count, total_size, avg_size, largest_item) = manager.get_usage_stats().await;
 

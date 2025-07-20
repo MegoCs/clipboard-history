@@ -1,9 +1,9 @@
+use base64::prelude::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use uuid::Uuid;
-use base64::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClipboardContentType {
@@ -84,7 +84,12 @@ impl ClipboardItem {
         let mut hasher = DefaultHasher::new();
         match content {
             ClipboardContentType::Text(text) => text.hash(&mut hasher),
-            ClipboardContentType::Image { data, format, width, height } => {
+            ClipboardContentType::Image {
+                data,
+                format,
+                width,
+                height,
+            } => {
                 data.hash(&mut hasher);
                 format.hash(&mut hasher);
                 width.hash(&mut hasher);
@@ -117,15 +122,18 @@ impl ClipboardItem {
     pub fn searchable_content(&self) -> String {
         match &self.content {
             ClipboardContentType::Text(text) => text.clone(),
-            ClipboardContentType::Image { width, height, format, .. } => {
+            ClipboardContentType::Image {
+                width,
+                height,
+                format,
+                ..
+            } => {
                 format!("Image {}x{} {:?}", width, height, format)
             }
             ClipboardContentType::Html { html, plain_text } => {
                 plain_text.as_ref().unwrap_or(html).clone()
             }
-            ClipboardContentType::Files(files) => {
-                files.join(" ")
-            }
+            ClipboardContentType::Files(files) => files.join(" "),
             ClipboardContentType::Other { content_type, .. } => {
                 format!("Binary data: {}", content_type)
             }
@@ -182,7 +190,12 @@ impl ClipboardItem {
     pub fn display_content(&self) -> String {
         match &self.content {
             ClipboardContentType::Text(text) => text.clone(),
-            ClipboardContentType::Image { width, height, format, .. } => {
+            ClipboardContentType::Image {
+                width,
+                height,
+                format,
+                ..
+            } => {
                 format!("{}x{} {:?} image", width, height, format)
             }
             ClipboardContentType::Html { plain_text, html } => {
@@ -221,12 +234,8 @@ impl ClipboardItem {
             ClipboardContentType::Html { html, plain_text } => {
                 html.len() + plain_text.as_ref().map_or(0, |t| t.len())
             }
-            ClipboardContentType::Files(files) => {
-                files.iter().map(|f| f.len()).sum::<usize>()
-            }
-            ClipboardContentType::Other { content_type, data } => {
-                content_type.len() + data.len()
-            }
+            ClipboardContentType::Files(files) => files.iter().map(|f| f.len()).sum::<usize>(),
+            ClipboardContentType::Other { content_type, data } => content_type.len() + data.len(),
         }
     }
 
